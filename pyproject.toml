@@ -1,0 +1,162 @@
+[project]
+name = "web-fetch"
+version = "0.1.0"
+description = "Modern async web scraping/fetching utility with AIOHTTP"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Web Fetch Team", email = "team@webfetch.dev"}
+]
+maintainers = [
+    {name = "Web Fetch Team", email = "team@webfetch.dev"}
+]
+keywords = ["async", "http", "ftp", "web-scraping", "aiohttp", "fetching"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Framework :: AsyncIO",
+]
+dependencies = [
+    "aiohttp>=3.9.0",
+    "pydantic>=2.0.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "aiofiles>=23.0.0",
+    "aioftp>=0.21.0",
+    # New resource type dependencies
+    "PyPDF2>=3.0.0",           # PDF parsing
+    "Pillow>=10.0.0",          # Image processing
+    "feedparser>=6.0.0",       # RSS/Atom feed parsing
+    "pandas>=2.0.0",           # CSV parsing and data handling
+    "html2text>=2020.1.16",    # HTML to Markdown conversion
+    "python-magic>=0.4.27",    # Enhanced content type detection
+    "nltk>=3.8.0",             # Text processing and summarization
+    "scikit-learn>=1.3.0",     # Text analysis and feature extraction
+    "playwright>=1.40.0",      # JavaScript-rendered content support
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=4.0.0",
+    "aioresponses>=0.7.4",
+    "httpx>=0.24.0",  # For additional testing utilities
+]
+dev = [
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.5.0",
+    "flake8>=6.0.0",
+    "pre-commit>=3.0.0",
+]
+crawlers = [
+    "firecrawl-py>=0.0.16",     # Firecrawl API SDK
+    "tavily-python>=0.3.0",    # Tavily API SDK
+    "requests>=2.31.0",        # For Spider.cloud and AnyCrawl HTTP requests
+]
+all-crawlers = [
+    "web-fetch[crawlers]",
+]
+
+[project.scripts]
+web-fetch = "web_fetch.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/web-fetch/web-fetch"
+Documentation = "https://github.com/web-fetch/web-fetch/blob/main/README.md"
+Repository = "https://github.com/web-fetch/web-fetch"
+Issues = "https://github.com/web-fetch/web-fetch/issues"
+Changelog = "https://github.com/web-fetch/web-fetch/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["web_fetch*"]
+exclude = ["tests*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["web_fetch"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "aiofiles.*",
+    "aioftp.*",
+    "aioresponses.*",
+    "bs4.*",
+]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101", "B601"]  # Skip assert_used and shell_injection_process_args
+
+[tool.coverage.run]
+source = ["web_fetch"]
+omit = [
+    "*/tests/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/examples/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
