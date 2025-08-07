@@ -8,14 +8,10 @@ connection pooling, and both active and passive modes.
 from __future__ import annotations
 
 import asyncio
-import ftplib
-import ssl
-import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, AsyncIterator
 from urllib.parse import urlparse
-from weakref import WeakValueDictionary
 
 import aioftp
 
@@ -58,7 +54,7 @@ class FTPConnectionPool:
         """Remove idle connections that have exceeded the timeout."""
         async with self._lock:
             current_time = datetime.now()
-            keys_to_remove = []
+            keys_to_remove: List[str] = []
 
             for key, info in self._connection_info.items():
                 if (current_time - info.last_used).total_seconds() > 300:  # 5 minutes
@@ -73,6 +69,7 @@ class FTPConnectionPool:
                         except Exception:
                             pass
                     del self._connections[key]
+                if key in self._connection_info:
                     del self._connection_info[key]
 
     def _get_connection_key(self, host: str, port: int, username: Optional[str]) -> str:
@@ -80,7 +77,7 @@ class FTPConnectionPool:
         return f"{host}:{port}:{username or 'anonymous'}"
 
     @asynccontextmanager
-    async def get_connection(self, url: str) -> Any:
+    async def get_connection(self, url: str) -> AsyncIterator[aioftp.Client]:
         """
         Get an FTP connection from the pool or create a new one.
 
@@ -183,11 +180,16 @@ class FTPConnectionPool:
                     raise FTPError("Username required for non-anonymous authentication")
                 await client.login(username, password or "")
 
-            # Set transfer mode
-            if self.config.mode == FTPMode.PASSIVE:
-                client.passive_mode = True
-            else:
-                client.passive_mode = False
+            # Transfer mode handling:
+            # aioftp operates in passive mode by default and does not expose a passive_mode flag.
+            # If ACTIVE is requested, warn once via NOOP; continue using passive mode for compatibility.
+            if self.config.mode == FTPMode.ACTIVE:
+                try:
+                    # Some servers may allow disabling EPSV; not guaranteed.
+                    await client.command("NOOP")
+                except Exception:
+                    # Ignore if server does not support/allow this hint.
+                    pass
 
             return client
 

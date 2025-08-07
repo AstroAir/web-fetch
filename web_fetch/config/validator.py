@@ -6,10 +6,21 @@ This module provides validation and sanitization of configuration values.
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from typing import List, Tuple
 
-from .models import Environment, GlobalConfig, LogLevel
+# Explicit module exports to aid static analyzers (e.g., Pylance)
+__all__ = ["ConfigValidator", "ValidationError"]
+
+from .models import (
+    Environment,
+    GlobalConfig,
+    LogLevel,
+    LoggingConfig,
+    SecurityConfig,
+    PerformanceConfig,
+    FeatureFlags,
+    EnvironmentConfig,
+)
 
 
 class ValidationError(Exception):
@@ -49,7 +60,7 @@ class ConfigValidator:
 
         return len(self.errors) == 0, self.errors.copy(), self.warnings.copy()
 
-    def _validate_logging(self, logging_config) -> None:
+    def _validate_logging(self, logging_config: LoggingConfig) -> None:
         """Validate logging configuration."""
         # Validate log level
         if logging_config.level not in LogLevel:
@@ -77,7 +88,8 @@ class ConfigValidator:
 
         # Validate format string
         try:
-            logging_config.format % {
+            # Assign to a dummy variable to avoid 'expression value not used' warnings
+            _ = logging_config.format % {
                 "asctime": "2023-01-01 12:00:00",
                 "name": "test",
                 "levelname": "INFO",
@@ -86,7 +98,7 @@ class ConfigValidator:
         except (KeyError, ValueError) as e:
             self.errors.append(f"Invalid log format string: {e}")
 
-    def _validate_security(self, security_config) -> None:
+    def _validate_security(self, security_config: SecurityConfig) -> None:
         """Validate security configuration."""
         # Validate SSL certificate paths
         if security_config.ssl_cert_path:
@@ -130,7 +142,7 @@ class ConfigValidator:
                 if not self._is_valid_hostname(host):
                     self.errors.append(f"Invalid allowed hostname: {host}")
 
-    def _validate_performance(self, performance_config) -> None:
+    def _validate_performance(self, performance_config: PerformanceConfig) -> None:
         """Validate performance configuration."""
         # Validate connection limits
         if performance_config.max_connections <= 0:
@@ -186,7 +198,7 @@ class ConfigValidator:
         if performance_config.dns_cache_ttl < 0:
             self.errors.append("DNS cache TTL cannot be negative")
 
-    def _validate_features(self, features_config) -> None:
+    def _validate_features(self, features_config: FeatureFlags) -> None:
         """Validate feature flags."""
         # Check for conflicting features
         if not features_config.enable_caching and features_config.enable_deduplication:
@@ -199,7 +211,7 @@ class ConfigValidator:
                 "JavaScript rendering is experimental and may impact performance"
             )
 
-    def _validate_environment(self, env_config) -> None:
+    def _validate_environment(self, env_config: EnvironmentConfig) -> None:
         """Validate environment configuration."""
         # Validate environment
         if env_config.environment not in Environment:
@@ -258,7 +270,7 @@ class ConfigValidator:
             Sanitized configuration
         """
         # Create a copy to avoid modifying the original
-        config_dict = config.dict()
+        config_dict = config.model_dump()
 
         # Sanitize performance settings
         perf = config_dict.get("performance", {})
@@ -287,4 +299,4 @@ class ConfigValidator:
             security["max_redirects"] = 50
 
         # Create new config with sanitized values
-        return GlobalConfig(**config_dict)
+        return GlobalConfig.model_construct(**config_dict)

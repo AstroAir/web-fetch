@@ -297,10 +297,11 @@ class FTPFetcher:
         Returns:
             FTPResult with operation result
         """
+        # Lazy import once to avoid circular imports and ensure symbol binding across branches
+        from ..exceptions import FTPError
+
         if request.operation == "download":
             if request.local_path is None:
-                from ..exceptions import FTPError
-
                 raise FTPError(
                     "Local path required for download operation", request.url
                 )
@@ -343,8 +344,7 @@ class FTPFetcher:
             )
 
         else:
-            from .exceptions import FTPError
-
+            # Reuse FTPError imported earlier in this function scope (line ~302)
             raise FTPError(f"Unsupported operation: {request.operation}", request.url)
 
     # Verification methods

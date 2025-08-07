@@ -14,7 +14,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Literal,
     Optional,
     Tuple,
     TypeAlias,
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     from .content_analyzer import ContentAnalyzer
     from .link_extractor import LinkExtractor
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ContentError, WebFetchError
 from ..models.base import ContentType
@@ -171,49 +170,43 @@ class EnhancedContentParser:
                     return content_bytes, result
 
                 case ContentType.TEXT:
-                    content = self._parse_text(content_bytes)
+                    text_content = self._parse_text(content_bytes)
                     # Add content analysis for text content
-                    if (
-                        isinstance(content, str) and len(content) > 100
-                    ):  # Only analyze substantial text
+                    if len(text_content) > 100:  # Only analyze substantial text
                         try:
                             result.content_summary = (
-                                self.content_analyzer.analyze_content(content)
+                                self.content_analyzer.analyze_content(text_content)
                             )
-                        except Exception as e:
-                            logger.warning(f"Content analysis failed: {e}")
-                    return content, result
+                        except Exception:
+                            logger.warning("Content analysis failed")
+                    return text_content, result
 
                 case ContentType.JSON:
-                    content = self._parse_json(content_bytes, url, headers)
-                    return content, result
+                    json_content = self._parse_json(content_bytes, url, headers)
+                    return json_content, result
 
                 case ContentType.HTML:
-                    content = self._parse_html(content_bytes)
+                    html_content = self._parse_html(content_bytes)
                     # Add content analysis for HTML text content
-                    if (
-                        isinstance(content, dict)
-                        and "text" in content
-                        and len(content["text"]) > 100
-                    ):
+                    if "text" in html_content and isinstance(html_content["text"], str) and len(html_content["text"]) > 100:
                         try:
                             result.content_summary = (
-                                self.content_analyzer.analyze_content(content["text"])
+                                self.content_analyzer.analyze_content(html_content["text"])
                             )
-                        except Exception as e:
-                            logger.warning(f"Content analysis failed: {e}")
+                        except Exception:
+                            logger.warning("Content analysis failed")
 
                     # Extract links from HTML content
-                    if isinstance(content, dict) and "raw_html" in content:
+                    if "raw_html" in html_content and isinstance(html_content["raw_html"], str):
                         try:
                             links = await self.link_extractor.extract_links(
-                                content["raw_html"], content_type="html", base_url=url
+                                html_content["raw_html"], content_type="html", base_url=url
                             )
                             result.links = links
-                        except Exception as e:
-                            logger.warning(f"Link extraction failed: {e}")
+                        except Exception:
+                            logger.warning("Link extraction failed")
 
-                    return content, result
+                    return html_content, result
 
                 case ContentType.PDF:
                     return await self._parse_pdf(content_bytes, url, result)
@@ -234,9 +227,10 @@ class EnhancedContentParser:
                     return await self._parse_xml(content_bytes, url, result)
 
                 case _:
-                    # Default to text parsing
-                    content = self._parse_text(content_bytes)
-                    return content, result
+                    # Fallback: parse as text to handle potential future enum values gracefully.
+                    # Keep this branch reachable to satisfy static analyzers (e.g., mypy) and provide robustness.
+                    text_content = self._parse_text(content_bytes)
+                    return text_content, result
 
         except Exception as e:
             logger.error(f"Failed to parse content as {requested_type}: {e}")
@@ -278,7 +272,7 @@ class EnhancedContentParser:
                     else None
                 ),
             }
-        except Exception as e:
+        except Exception:
             # Fallback to basic JSON parsing
             try:
                 text_content = content_bytes.decode("utf-8")
@@ -300,19 +294,28 @@ class EnhancedContentParser:
         try:
             text_content = content_bytes.decode("utf-8")
             soup = BeautifulSoup(text_content, "lxml")
+            
+            # Extract links with proper type checking
+            links = []
+            for a in soup.find_all("a", href=True):
+                if isinstance(a, Tag) and a.has_attr("href"):
+                    href = a.get("href")
+                    if href:
+                        links.append(href)
+            
+            # Extract images with proper type checking
+            images = []
+            for img in soup.find_all("img", src=True):
+                if isinstance(img, Tag) and img.has_attr("src"):
+                    src = img.get("src")
+                    if src:
+                        images.append(src)
+            
             return {
                 "title": soup.title.string if soup.title else None,
                 "text": soup.get_text(strip=True),
-                "links": [
-                    a.get("href")
-                    for a in soup.find_all("a", href=True)
-                    if hasattr(a, "get")
-                ],
-                "images": [
-                    img.get("src")
-                    for img in soup.find_all("img", src=True)
-                    if hasattr(img, "get")
-                ],
+                "links": links,
+                "images": images,
                 "raw_html": text_content,
             }
         except Exception as e:
@@ -421,18 +424,29 @@ class EnhancedContentParser:
             result.error = str(e)
             return {}, result
 
-    def _extract_xml_elements(self, soup) -> Dict[str, Any]:
+    def _extract_xml_elements(self, soup: BeautifulSoup) -> Dict[str, Any]:
         """Extract XML elements into a structured format."""
-        elements = {}
+        elements: Dict[str, List[Dict[str, Any]]] = {}
 
         for element in soup.find_all():
-            tag_name = element.name
+            # BeautifulSoup.find_all() may yield Tag, NavigableString, or PageElement.
+            # We only process Tag instances to satisfy typing and avoid attribute errors.
+            if not isinstance(element, Tag):
+                continue
+
+            tag_name: Optional[str] = element.name if isinstance(element.name, str) else None
+            if not tag_name:
+                # Skip items without a proper string tag name
+                continue
+
             if tag_name not in elements:
                 elements[tag_name] = []
 
-            element_data = {
+            attrs_dict: Dict[str, Any] = dict(element.attrs) if hasattr(element, "attrs") and element.attrs else {}
+
+            element_data: Dict[str, Any] = {
                 "text": element.get_text(strip=True),
-                "attributes": dict(element.attrs) if element.attrs else {},
+                "attributes": attrs_dict,
             }
             elements[tag_name].append(element_data)
 

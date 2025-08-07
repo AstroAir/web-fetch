@@ -13,7 +13,7 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import aiofiles
@@ -30,12 +30,156 @@ from .models import (
     FTPConfig,
     FTPFileInfo,
     FTPProgressInfo,
-    FTPRequest,
     FTPResult,
     FTPTransferMode,
     FTPVerificationMethod,
     FTPVerificationResult,
 )
+
+
+# Helper types matching aioftp list/stat structures
+PathWithInfo = Tuple[Any, Any]  # (PurePosixPath, BasicListInfo | UnixListInfo)
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    try:
+        if value is None:
+            return None
+        if isinstance(value, (int,)):
+            return value
+        if isinstance(value, (float,)):
+            # only accept if integral
+            iv = int(value)
+            return iv
+        if isinstance(value, str) and value.strip() != "":
+            return int(value)
+    except Exception:
+        return None
+    return None
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str) and value.strip() != "":
+            return float(value)
+    except Exception:
+        return None
+    return None
+
+
+def _to_datetime_from_epoch(epoch: Optional[float]) -> Optional[datetime]:
+    if epoch is None:
+        return None
+    try:
+        return datetime.fromtimestamp(float(epoch))
+    except Exception:
+        return None
+
+
+def _permissions_octal(mode: Optional[int]) -> Optional[str]:
+    if mode is None:
+        return None
+    try:
+        return oct(int(mode))
+    except Exception:
+        return None
+
+
+def _normalize_stat_like(obj: Any) -> Dict[str, Any]:
+    """
+    Convert aioftp stat/list info object or dict to a normalized dict.
+    Known fields: name, size, st_mtime, st_mode, type (dir/file), is_dir.
+    """
+    result: Dict[str, Any] = {}
+
+    # If dict-like
+    if isinstance(obj, dict):
+        result.update(obj)
+        # normalize typical aliases
+        size = _safe_int(result.get("size"))
+        mtime = _safe_float(result.get("st_mtime") if "st_mtime" in result else result.get("mtime"))
+        mode = _safe_int(result.get("st_mode") if "st_mode" in result else result.get("mode"))
+        # derive is_dir if given explicitly or from type
+        is_dir = result.get("is_dir")
+        if callable(is_dir):
+            try:
+                is_dir = bool(is_dir())
+            except Exception:
+                is_dir = None
+        if is_dir is None:
+            type_val = result.get("type")
+            is_dir = True if type_val in ("dir", "directory") else False if type_val in ("file",) else None
+
+        if size is not None:
+            result["size"] = size
+        if mtime is not None:
+            result["st_mtime"] = mtime
+        if mode is not None:
+            result["st_mode"] = mode
+        if is_dir is not None:
+            result["is_dir"] = bool(is_dir)
+        return result
+
+    # Object with attributes
+    # Try common attributes on aioftp BasicListInfo / UnixListInfo
+    name = getattr(obj, "name", None)
+    size = getattr(obj, "size", None)
+    st_mtime = getattr(obj, "st_mtime", None)
+    st_mode = getattr(obj, "st_mode", None)
+    type_val = getattr(obj, "type", None)
+    is_dir_attr = getattr(obj, "is_dir", None)
+
+    result["name"] = name
+    size = _safe_int(size)
+    if size is not None:
+        result["size"] = size
+
+    mtime = _safe_float(st_mtime)
+    if mtime is not None:
+        result["st_mtime"] = mtime
+
+    mode = _safe_int(st_mode)
+    if mode is not None:
+        result["st_mode"] = mode
+
+    if callable(is_dir_attr):
+        try:
+            result["is_dir"] = bool(is_dir_attr())
+        except Exception:
+            pass
+    elif isinstance(is_dir_attr, bool):
+        result["is_dir"] = is_dir_attr
+    elif type_val in ("dir", "directory"):
+        result["is_dir"] = True
+    elif type_val in ("file",):
+        result["is_dir"] = False
+
+    return result
+
+
+def _from_path_with_info(pwi: PathWithInfo) -> Dict[str, Any]:
+    """
+    Extract normalized info from (path, info) tuple yielded by aioftp.Client.list().
+    """
+    path_obj, info_obj = pwi  # path_obj: PurePosixPath, info_obj: BasicListInfo|UnixListInfo
+    info = _normalize_stat_like(info_obj)
+    # name and path
+    try:
+        # Prefer info-provided name, else derive from path
+        name = info.get("name")
+        if not name and hasattr(path_obj, "name"):
+            name = path_obj.name
+        info["name"] = name
+    except Exception:
+        pass
+
+    info["path"] = str(path_obj) if path_obj is not None else info.get("path")
+
+    return info
 
 
 class FTPFileOperations:
@@ -73,27 +217,17 @@ class FTPFileOperations:
                     await client.change_directory(path)
 
                 # List directory contents
-                files = []
-                async for path_info in client.list():
+                files: List[FTPFileInfo] = []
+                async for pwi in client.list():  # yields (path, info)
+                    info = _from_path_with_info(pwi)
+
                     file_info = FTPFileInfo(
-                        name=path_info.name,
-                        path=str(path_info),
-                        size=(
-                            path_info.stat.size
-                            if hasattr(path_info.stat, "size")
-                            else None
-                        ),
-                        modified_time=(
-                            datetime.fromtimestamp(path_info.stat.st_mtime)
-                            if hasattr(path_info.stat, "st_mtime")
-                            else None
-                        ),
-                        is_directory=path_info.is_dir(),
-                        permissions=(
-                            oct(path_info.stat.st_mode)
-                            if hasattr(path_info.stat, "st_mode")
-                            else None
-                        ),
+                        name=str(info.get("name") or ""),
+                        path=str(info.get("path") or ""),
+                        size=_safe_int(info.get("size")),
+                        modified_time=_to_datetime_from_epoch(_safe_float(info.get("st_mtime"))),
+                        is_directory=bool(info.get("is_dir") or False),
+                        permissions=_permissions_octal(_safe_int(info.get("st_mode"))),
                     )
                     files.append(file_info)
 
@@ -119,27 +253,16 @@ class FTPFileOperations:
 
                 # Get file/directory info
                 try:
-                    stat_info = await client.stat(path)
+                    stat_raw = await client.stat(path)
+                    stat_info = _normalize_stat_like(stat_raw)
 
                     file_info = FTPFileInfo(
                         name=os.path.basename(path),
                         path=path,
-                        size=stat_info.size if hasattr(stat_info, "size") else None,
-                        modified_time=(
-                            datetime.fromtimestamp(stat_info.st_mtime)
-                            if hasattr(stat_info, "st_mtime")
-                            else None
-                        ),
-                        is_directory=(
-                            stat_info.is_dir()
-                            if hasattr(stat_info, "is_dir")
-                            else False
-                        ),
-                        permissions=(
-                            oct(stat_info.st_mode)
-                            if hasattr(stat_info, "st_mode")
-                            else None
-                        ),
+                        size=_safe_int(stat_info.get("size")),
+                        modified_time=_to_datetime_from_epoch(_safe_float(stat_info.get("st_mtime"))),
+                        is_directory=bool(stat_info.get("is_dir") or False),
+                        permissions=_permissions_octal(_safe_int(stat_info.get("st_mode"))),
                     )
 
                     return file_info
@@ -151,27 +274,16 @@ class FTPFileOperations:
 
                     if parent_path != path:
                         await client.change_directory(parent_path)
-                        async for path_info in client.list():
-                            if path_info.name == filename:
+                        async for pwi in client.list():
+                            info = _from_path_with_info(pwi)
+                            if str(info.get("name") or "") == filename:
                                 return FTPFileInfo(
-                                    name=path_info.name,
+                                    name=str(info.get("name") or ""),
                                     path=path,
-                                    size=(
-                                        path_info.stat.size
-                                        if hasattr(path_info.stat, "size")
-                                        else None
-                                    ),
-                                    modified_time=(
-                                        datetime.fromtimestamp(path_info.stat.st_mtime)
-                                        if hasattr(path_info.stat, "st_mtime")
-                                        else None
-                                    ),
-                                    is_directory=path_info.is_dir(),
-                                    permissions=(
-                                        oct(path_info.stat.st_mode)
-                                        if hasattr(path_info.stat, "st_mode")
-                                        else None
-                                    ),
+                                    size=_safe_int(info.get("size")),
+                                    modified_time=_to_datetime_from_epoch(_safe_float(info.get("st_mtime"))),
+                                    is_directory=bool(info.get("is_dir") or False),
+                                    permissions=_permissions_octal(_safe_int(info.get("st_mode"))),
                                 )
 
                     raise FTPFileNotFoundError(f"File not found: {path}", url)

@@ -16,7 +16,7 @@ from .models.base import ContentType
 
 # Enhanced convenience functions
 from .models.http import FetchConfig, FetchRequest, FetchResult
-from .src.convenience import (
+from .convenience import (
     download_file,
     fetch_url,
     fetch_urls,
@@ -24,9 +24,9 @@ from .src.convenience import (
 )
 
 # Import all components from the modular structure
-from .src.core_fetcher import WebFetcher
-from .src.streaming_fetcher import StreamingWebFetcher
-from .src.url_utils import (
+from .core_fetcher import WebFetcher
+from .streaming_fetcher import StreamingWebFetcher
+from .url_utils import (
     analyze_headers,
     analyze_url,
     detect_content_type,

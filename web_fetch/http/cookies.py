@@ -6,10 +6,9 @@ security features, and domain management.
 """
 
 import json
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
@@ -140,10 +139,10 @@ class CookieJar:
         path = parsed.path or "/"
         is_secure = parsed.scheme == "https"
 
-        applicable_cookies = []
+        applicable_cookies: List[Cookie] = []
 
         # Check all domains
-        for cookie_domain, cookies in self._cookies.items():
+        for _cookie_domain, cookies in self._cookies.items():
             for cookie in cookies.values():
                 # Skip expired cookies
                 if cookie.is_expired:
@@ -324,7 +323,7 @@ class CookieJar:
         Returns:
             List of all cookies
         """
-        all_cookies = []
+        all_cookies: List[Cookie] = []
         for domain_cookies in self._cookies.values():
             all_cookies.extend(domain_cookies.values())
         return all_cookies
@@ -335,13 +334,13 @@ class CookieJar:
             return
 
         # Prepare data for serialization
-        data = {}
+        data: Dict[str, Dict[str, Dict[str, Any]]] = {}
         for domain, cookies in self._cookies.items():
             data[domain] = {}
             for name, cookie in cookies.items():
-                cookie_data = cookie.dict()
+                cookie_data = cookie.model_dump()
                 # Convert datetime objects to ISO strings
-                if cookie_data["expires"]:
+                if cookie_data.get("expires"):
                     cookie_data["expires"] = cookie_data["expires"].isoformat()
                 cookie_data["created_at"] = cookie_data["created_at"].isoformat()
                 cookie_data["last_accessed"] = cookie_data["last_accessed"].isoformat()
@@ -367,7 +366,7 @@ class CookieJar:
                 self._cookies[domain] = {}
                 for name, cookie_data in cookies.items():
                     # Convert ISO strings back to datetime objects
-                    if cookie_data["expires"]:
+                    if cookie_data.get("expires"):
                         cookie_data["expires"] = datetime.fromisoformat(
                             cookie_data["expires"]
                         )
@@ -409,7 +408,7 @@ class CookieManager:
             url: Request URL
         """
         # Handle Set-Cookie headers
-        set_cookie_headers = []
+        set_cookie_headers: List[str] = []
 
         for name, value in response_headers.items():
             if name.lower() == "set-cookie":
@@ -428,7 +427,7 @@ class CookieManager:
         Returns:
             Headers dictionary
         """
-        headers = {}
+        headers: Dict[str, str] = {}
 
         cookie_header = self.jar.get_cookie_header(url)
         if cookie_header:

@@ -7,8 +7,8 @@ proper request/response handling and validation.
 
 import json
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urlencode
+from typing import Any, Dict, List, Optional, Union, Protocol
+from urllib.parse import urlencode  # used by callers; keep imported
 
 import aiohttp
 from pydantic import BaseModel, Field
@@ -42,12 +42,24 @@ class RequestBody(BaseModel):
     encoding: str = "utf-8"
 
 
+class _MethodHandlerProto(Protocol):
+    async def __call__(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        headers: Optional[Dict[str, str]],
+        body: Optional[RequestBody],
+        params: Optional[Dict[str, Any]],
+        **kwargs: Any,
+    ) -> aiohttp.ClientResponse: ...
+
 class HTTPMethodHandler:
     """Handler for different HTTP methods."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize HTTP method handler."""
-        self._method_handlers = {
+        # 使用 Protocol 明确处理函数签名，避免变量类型别名在类型表达式中的限制
+        self._method_handlers: Dict[HTTPMethod, _MethodHandlerProto] = {
             HTTPMethod.GET: self._handle_get,
             HTTPMethod.POST: self._handle_post,
             HTTPMethod.PUT: self._handle_put,
@@ -66,7 +78,7 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]] = None,
         body: Optional[RequestBody] = None,
         params: Optional[Dict[str, Any]] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """
         Execute HTTP request with specified method.
@@ -90,6 +102,7 @@ class HTTPMethodHandler:
             raise WebFetchError(f"Unsupported HTTP method: {method}")
 
         handler = self._method_handlers[method]
+        # 通过 Protocol 已经将返回类型限定为 aiohttp.ClientResponse
         return await handler(session, url, headers, body, params, **kwargs)
 
     async def _handle_get(
@@ -99,7 +112,7 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle GET request."""
         return await session.get(url, headers=headers, params=params, **kwargs)
@@ -111,10 +124,10 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle POST request."""
-        request_kwargs = self._prepare_request_body(body, headers)
+        request_kwargs: Dict[str, Any] = self._prepare_request_body(body, headers)
         request_kwargs.update(kwargs)
 
         return await session.post(url, headers=headers, params=params, **request_kwargs)
@@ -126,10 +139,10 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle PUT request."""
-        request_kwargs = self._prepare_request_body(body, headers)
+        request_kwargs: Dict[str, Any] = self._prepare_request_body(body, headers)
         request_kwargs.update(kwargs)
 
         return await session.put(url, headers=headers, params=params, **request_kwargs)
@@ -141,10 +154,10 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle DELETE request."""
-        request_kwargs = {}
+        request_kwargs: Dict[str, Any] = {}
         if body:
             request_kwargs = self._prepare_request_body(body, headers)
         request_kwargs.update(kwargs)
@@ -160,7 +173,7 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle HEAD request."""
         return await session.head(url, headers=headers, params=params, **kwargs)
@@ -172,7 +185,7 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle OPTIONS request."""
         return await session.options(url, headers=headers, params=params, **kwargs)
@@ -184,10 +197,10 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle PATCH request."""
-        request_kwargs = self._prepare_request_body(body, headers)
+        request_kwargs: Dict[str, Any] = self._prepare_request_body(body, headers)
         request_kwargs.update(kwargs)
 
         return await session.patch(
@@ -201,10 +214,17 @@ class HTTPMethodHandler:
         headers: Optional[Dict[str, str]],
         body: Optional[RequestBody],
         params: Optional[Dict[str, Any]],
-        **kwargs,
+        **kwargs: Any,
     ) -> aiohttp.ClientResponse:
         """Handle TRACE request."""
-        return await session.trace(url, headers=headers, params=params, **kwargs)
+        # aiohttp doesn't expose session.trace; use generic request
+        request_kwargs: Dict[str, Any] = {}
+        if body:
+            request_kwargs = self._prepare_request_body(body, headers)
+        request_kwargs.update(kwargs)
+        return await session.request(
+            "TRACE", url, headers=headers, params=params, **request_kwargs
+        )
 
     def _prepare_request_body(
         self, body: Optional[RequestBody], headers: Optional[Dict[str, str]]
@@ -222,7 +242,7 @@ class HTTPMethodHandler:
         if not body:
             return {}
 
-        request_kwargs = {}
+        request_kwargs: Dict[str, Any] = {}
 
         # Handle JSON data
         if body.json_data is not None:
@@ -252,7 +272,7 @@ class HTTPMethodHandler:
                     else:
                         form_data.add_field(key, file_info)
 
-                request_kwargs["data"] = form_data
+                request_kwargs["data"] = form_data  # FormData acceptable for aiohttp
             else:
                 # URL-encoded form data
                 request_kwargs["data"] = body.form_data
@@ -264,7 +284,7 @@ class HTTPMethodHandler:
         # Handle raw data
         elif body.data is not None:
             if isinstance(body.data, dict):
-                # Convert dict to JSON string
+                # Convert dict to JSON bytes
                 request_kwargs["data"] = json.dumps(body.data).encode(body.encoding)
                 if headers and "content-type" not in (
                     k.lower() for k in headers.keys()
@@ -273,6 +293,7 @@ class HTTPMethodHandler:
             elif isinstance(body.data, str):
                 request_kwargs["data"] = body.data.encode(body.encoding)
             else:
+                # bytes or other supported payloads
                 request_kwargs["data"] = body.data
 
             # Set content type if specified

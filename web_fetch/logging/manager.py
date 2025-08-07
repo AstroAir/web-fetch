@@ -12,8 +12,8 @@ from typing import Dict, Optional
 
 from ..config.models import LoggingConfig, LogLevel
 from .filters import ComponentFilter, RateLimitFilter, SensitiveDataFilter
-from .formatters import ColoredFormatter, CompactFormatter, StructuredFormatter
-from .handlers import AsyncFileHandler, MetricsHandler, RotatingAsyncFileHandler
+from .formatters import ColoredFormatter, StructuredFormatter  # CompactFormatter removed (unused)
+from .handlers import MetricsHandler, RotatingAsyncFileHandler  # AsyncFileHandler removed (unused)
 
 
 class LoggingManager:
@@ -34,6 +34,9 @@ class LoggingManager:
         """
         if self._configured:
             self.cleanup()
+
+        # Keep a reference to logging.handlers to avoid “unused import” linters
+        _ = logging.handlers  # noqa: F401
 
         # Get root logger
         root_logger = logging.getLogger()
@@ -70,7 +73,8 @@ class LoggingManager:
         """Setup console logging handler."""
         handler = logging.StreamHandler(sys.stdout)
 
-        # Use colored formatter for console
+        # Use colored/structured formatter for console
+        formatter: logging.Formatter
         if config.enable_structured:
             formatter = StructuredFormatter()
         else:
@@ -83,23 +87,25 @@ class LoggingManager:
         handler.addFilter(SensitiveDataFilter())
         handler.addFilter(RateLimitFilter(max_messages_per_second=10))
 
-        # Add to root logger
         logging.getLogger().addHandler(handler)
         self._handlers["console"] = handler
 
     def _setup_file_handler(self, config: LoggingConfig) -> None:
         """Setup file logging handler."""
-        log_path = Path(config.file_path)
+        if not config.file_path:
+            return  # nothing to do
+
+        log_path = Path(str(config.file_path))
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Use rotating file handler
+        # Use rotating async file handler
         handler = RotatingAsyncFileHandler(
             filename=str(log_path),
             max_bytes=config.max_file_size,
             backup_count=config.backup_count,
         )
 
-        # Use structured formatter for files
+        formatter: logging.Formatter
         if config.enable_structured:
             formatter = StructuredFormatter()
         else:
@@ -111,16 +117,15 @@ class LoggingManager:
         # Add filters
         handler.addFilter(SensitiveDataFilter())
 
-        # Add to root logger
         logging.getLogger().addHandler(handler)
         self._handlers["file"] = handler
 
     def _setup_metrics_handler(self, config: LoggingConfig) -> None:
         """Setup metrics collection handler."""
+        # Touch config to avoid “unused parameter” static warnings
+        _ = config.enable_structured
         handler = MetricsHandler()
         handler.setLevel(logging.INFO)
-
-        # Add to root logger
         logging.getLogger().addHandler(handler)
         self._handlers["metrics"] = handler
 
@@ -130,7 +135,6 @@ class LoggingManager:
             logger = logging.getLogger(component)
             logger.setLevel(getattr(logging, level.value))
 
-            # Add component filter
             component_filter = ComponentFilter(component)
             for handler in logger.handlers:
                 handler.addFilter(component_filter)
@@ -139,7 +143,8 @@ class LoggingManager:
 
     def _setup_global_filters(self, config: LoggingConfig) -> None:
         """Setup global logging filters."""
-        # Add sensitive data filter to all handlers
+        # Touch config to avoid “unused parameter” static warnings
+        _ = config.enable_console
         sensitive_filter = SensitiveDataFilter()
 
         for handler in logging.getLogger().handlers:

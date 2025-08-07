@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from ..models.http import HeaderAnalysis, URLAnalysis
+from web_fetch.models.http import HeaderAnalysis, URLAnalysis
 
 
 def is_valid_url(url: str) -> bool:
@@ -33,7 +33,7 @@ def is_valid_url(url: str) -> bool:
         is_valid_url("ftp://files.example.com/file.txt")  # True
         ```
     """
-    from ..utils import URLValidator
+    from web_fetch.utils import URLValidator
 
     return URLValidator.is_valid_url(url)
 
@@ -68,7 +68,7 @@ def normalize_url(url: str, base_url: Optional[str] = None) -> str:
     """
     from urllib.parse import urljoin
 
-    from ..utils import URLValidator
+    from web_fetch.utils import URLValidator
 
     # Resolve relative URL against base_url if provided
     if base_url:
@@ -111,7 +111,7 @@ def analyze_url(url: str) -> URLAnalysis:
         print(f"Query: {analysis.query}")  # {'key': 'value'}
         ```
     """
-    from ..utils import URLValidator
+    from web_fetch.utils import URLValidator
 
     return URLValidator.analyze_url(url)
 
@@ -151,7 +151,7 @@ def analyze_headers(headers: Dict[str, str]) -> HeaderAnalysis:
         print(f"Encoding: {analysis.encoding}")  # utf-8
         ```
     """
-    from ..utils import ResponseAnalyzer
+    from web_fetch.utils import ResponseAnalyzer
 
     return ResponseAnalyzer.analyze_headers(headers)
 
@@ -194,6 +194,6 @@ def detect_content_type(headers: Dict[str, str], content: bytes) -> str:
         print(content_type)  # image/png
         ```
     """
-    from ..utils import ResponseAnalyzer
+    from web_fetch.utils import ResponseAnalyzer
 
     return ResponseAnalyzer.detect_content_type(headers, content)

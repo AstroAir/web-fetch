@@ -8,10 +8,9 @@ key phrase extraction, readability metrics, and language detection.
 from __future__ import annotations
 
 import logging
-import math
 import re
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Set
 
 try:
     import nltk
@@ -22,17 +21,22 @@ try:
     HAS_NLTK = True
 except ImportError:
     HAS_NLTK = False
+    nltk = None
+    stopwords = None
+    PorterStemmer = None
+    sent_tokenize = None
+    word_tokenize = None
 
 try:
     import numpy as np
     from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
 
     HAS_SKLEARN = True
 except ImportError:
     HAS_SKLEARN = False
+    np = None
+    TfidfVectorizer = None
 
-from ..exceptions import ContentError
 from ..models.base import ContentSummary
 
 logger = logging.getLogger(__name__)
@@ -41,13 +45,13 @@ logger = logging.getLogger(__name__)
 class ContentAnalyzer:
     """Content analyzer for text summarization and analysis."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize content analyzer."""
         self._ensure_nltk_data()
-        self.stemmer = PorterStemmer() if HAS_NLTK else None
+        self.stemmer = PorterStemmer() if HAS_NLTK and PorterStemmer is not None else None
 
         # Common stop words if NLTK is not available
-        self.fallback_stopwords = {
+        self.fallback_stopwords: Set[str] = {
             "a",
             "an",
             "and",
@@ -143,14 +147,13 @@ class ContentAnalyzer:
             "us",
         }
 
-    def _ensure_nltk_data(self):
+    def _ensure_nltk_data(self) -> None:
         """Ensure required NLTK data is downloaded."""
-        if not HAS_NLTK:
+        if not HAS_NLTK or nltk is None:
             logger.warning("NLTK not available, using fallback methods")
             return
 
         try:
-            # Try to use punkt tokenizer
             nltk.data.find("tokenizers/punkt")
         except LookupError:
             try:
@@ -159,7 +162,6 @@ class ContentAnalyzer:
                 logger.warning(f"Failed to download NLTK punkt data: {e}")
 
         try:
-            # Try to use stopwords
             nltk.data.find("corpora/stopwords")
         except LookupError:
             try:
@@ -236,31 +238,32 @@ class ContentAnalyzer:
 
     def _tokenize_sentences(self, text: str) -> List[str]:
         """Tokenize text into sentences."""
-        if HAS_NLTK:
+        if HAS_NLTK and sent_tokenize is not None:
             try:
-                return sent_tokenize(text)
+                tokens = sent_tokenize(text)
+                # Ensure list[str]
+                return [str(s).strip() for s in tokens if str(s).strip()]
             except Exception as e:
                 logger.warning(f"NLTK sentence tokenization failed: {e}")
 
-        # Fallback sentence tokenization
         sentences = re.split(r"[.!?]+", text)
         return [s.strip() for s in sentences if s.strip()]
 
     def _tokenize_words(self, text: str) -> List[str]:
         """Tokenize text into words."""
-        if HAS_NLTK:
+        if HAS_NLTK and word_tokenize is not None:
             try:
-                return word_tokenize(text.lower())
+                tokens = word_tokenize(text.lower())
+                return [str(w) for w in tokens]
             except Exception as e:
                 logger.warning(f"NLTK word tokenization failed: {e}")
 
-        # Fallback word tokenization
         words = re.findall(r"\b\w+\b", text.lower())
         return words
 
-    def _get_stopwords(self) -> set:
+    def _get_stopwords(self) -> Set[str]:
         """Get stopwords set."""
-        if HAS_NLTK:
+        if HAS_NLTK and stopwords is not None:
             try:
                 return set(stopwords.words("english"))
             except Exception as e:
@@ -276,32 +279,30 @@ class ContentAnalyzer:
         if len(sentences) <= length:
             return " ".join(sentences)
 
-        if HAS_SKLEARN:
+        if HAS_SKLEARN and TfidfVectorizer is not None and np is not None:
             return self._generate_tfidf_summary(sentences, length)
         else:
             return self._generate_frequency_summary(sentences, length)
 
     def _generate_tfidf_summary(self, sentences: List[str], length: int) -> str:
         """Generate summary using TF-IDF scoring."""
+        if not (HAS_SKLEARN and TfidfVectorizer is not None and np is not None):
+            return self._generate_frequency_summary(sentences, length)
         try:
-            # Create TF-IDF vectorizer
             vectorizer = TfidfVectorizer(
                 stop_words="english", lowercase=True, max_features=1000
             )
-
-            # Fit and transform sentences
             tfidf_matrix = vectorizer.fit_transform(sentences)
-
-            # Calculate sentence scores (sum of TF-IDF values)
-            sentence_scores = np.array(tfidf_matrix.sum(axis=1)).flatten()
-
-            # Get top sentences
-            top_indices = sentence_scores.argsort()[-length:][::-1]
-            top_indices = sorted(top_indices)  # Maintain original order
-
+            try:
+                row_sums = np.asarray(tfidf_matrix.sum(axis=1)).reshape(-1)
+            except Exception:
+                return self._generate_frequency_summary(sentences, length)
+            sentence_scores = row_sums
+            # Select top indices
+            top_indices_arr = sentence_scores.argsort()[-length:][::-1]
+            top_indices: List[int] = sorted([int(i) for i in top_indices_arr.tolist()])
             summary_sentences = [sentences[i] for i in top_indices]
             return " ".join(summary_sentences)
-
         except Exception as e:
             logger.warning(f"TF-IDF summarization failed: {e}")
             return self._generate_frequency_summary(sentences, length)
@@ -369,8 +370,8 @@ class ContentAnalyzer:
 
         # Trigrams
         for i in range(len(words) - 2):
-            if all(word not in stopwords_set for word in words[i : i + 3]) and all(
-                len(word) > 2 for word in words[i : i + 3]
+            if all(word not in stopwords_set for word in words[i: i + 3]) and all(
+                len(word) > 2 for word in words[i: i + 3]
             ):
                 phrase = f"{words[i]} {words[i+1]} {words[i+2]}"
                 phrases.append(phrase)

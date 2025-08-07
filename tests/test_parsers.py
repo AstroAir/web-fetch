@@ -36,16 +36,16 @@ from web_fetch.exceptions import ContentError
 class TestPDFParser:
     """Test PDF parser."""
 
-    @pytest.mark.skipif(not hasattr(PDFParser, '_has_pypdf2') or not PDFParser._has_pypdf2,
-                       reason="PyPDF2 not available")
+    @pytest.mark.skipif(not hasattr(PDFParser, '_has_pypdf') or not PDFParser._has_pypdf,
+                       reason="pypdf not available")
     def test_parse_pdf_content(self):
         """Test parsing PDF content."""
         parser = PDFParser()
-        
+
         # Mock PDF content
         mock_pdf_content = b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj"
-        
-        with patch('PyPDF2.PdfReader') as mock_reader:
+
+        with patch('pypdf.PdfReader') as mock_reader:
             mock_page = MagicMock()
             mock_page.extract_text.return_value = "Sample PDF text content"
             

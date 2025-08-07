@@ -2,7 +2,7 @@
 PDF content extraction and metadata parsing.
 
 This module provides functionality to extract text content and metadata from PDF documents
-using PyPDF2, with fallback handling for encrypted or corrupted files.
+using pypdf, with fallback handling for encrypted or corrupted files.
 """
 
 from __future__ import annotations
@@ -13,11 +13,11 @@ from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 try:
-    import PyPDF2
+    import pypdf
 
-    HAS_PYPDF2 = True
+    HAS_PYPDF = True
 except ImportError:
-    HAS_PYPDF2 = False
+    HAS_PYPDF = False
 
 from ..exceptions import ContentError
 from ..models.base import PDFMetadata
@@ -28,11 +28,13 @@ logger = logging.getLogger(__name__)
 class PDFParser:
     """Parser for extracting content and metadata from PDF documents."""
 
-    def __init__(self):
+    _has_pypdf = HAS_PYPDF
+
+    def __init__(self) -> None:
         """Initialize PDF parser."""
-        if not HAS_PYPDF2:
+        if not HAS_PYPDF:
             raise ImportError(
-                "PyPDF2 is required for PDF parsing. Install with: pip install PyPDF2"
+                "pypdf is required for PDF parsing. Install with: pip install pypdf"
             )
 
     def parse(
@@ -56,7 +58,7 @@ class PDFParser:
             pdf_stream = io.BytesIO(content)
 
             # Create PDF reader
-            pdf_reader = PyPDF2.PdfReader(pdf_stream)
+            pdf_reader = pypdf.PdfReader(pdf_stream)
 
             # Check if PDF is encrypted
             is_encrypted = pdf_reader.is_encrypted
@@ -79,14 +81,14 @@ class PDFParser:
 
             return extracted_text, metadata
 
-        except PyPDF2.errors.PdfReadError as e:
+        except pypdf.errors.PdfReadError as e:
             logger.error(f"Failed to read PDF from {url}: {e}")
             raise ContentError(f"Invalid or corrupted PDF file: {e}")
         except Exception as e:
             logger.error(f"Unexpected error parsing PDF from {url}: {e}")
             raise ContentError(f"Failed to parse PDF: {e}")
 
-    def _extract_metadata(self, pdf_reader: PyPDF2.PdfReader) -> PDFMetadata:
+    def _extract_metadata(self, pdf_reader: pypdf.PdfReader) -> PDFMetadata:
         """Extract metadata from PDF reader."""
         metadata = PDFMetadata()
 
@@ -123,7 +125,7 @@ class PDFParser:
 
         return metadata
 
-    def _extract_text(self, pdf_reader: PyPDF2.PdfReader) -> str:
+    def _extract_text(self, pdf_reader: pypdf.PdfReader) -> str:
         """Extract text from all pages of the PDF."""
         text_parts = []
 
@@ -207,7 +209,7 @@ class PDFParser:
         """
         try:
             pdf_stream = io.BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_stream)
+            pdf_reader = pypdf.PdfReader(pdf_stream)
 
             if page_number < 1 or page_number > len(pdf_reader.pages):
                 raise ContentError(
@@ -217,7 +219,7 @@ class PDFParser:
             page = pdf_reader.pages[page_number - 1]  # Convert to 0-based index
             return page.extract_text()
 
-        except PyPDF2.errors.PdfReadError as e:
+        except pypdf.errors.PdfReadError as e:
             raise ContentError(f"Failed to read PDF: {e}")
         except Exception as e:
             raise ContentError(f"Failed to extract page {page_number}: {e}")
@@ -237,10 +239,10 @@ class PDFParser:
         """
         try:
             pdf_stream = io.BytesIO(content)
-            pdf_reader = PyPDF2.PdfReader(pdf_stream)
+            pdf_reader = pypdf.PdfReader(pdf_stream)
             return len(pdf_reader.pages)
 
-        except PyPDF2.errors.PdfReadError as e:
+        except pypdf.errors.PdfReadError as e:
             raise ContentError(f"Failed to read PDF: {e}")
         except Exception as e:
             raise ContentError(f"Failed to get page count: {e}")

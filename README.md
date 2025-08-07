@@ -71,20 +71,44 @@ A powerful, production-ready web fetching library with advanced features includi
 
 ## 📦 Installation
 
+### From Source
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd web-fetch
 
-# Install dependencies (using uv)
+# Install dependencies (using uv - recommended)
 uv sync
 
 # Or install with pip
 pip install -e .
 
-# Install with test dependencies
-pip install -e ".[test]"
+# Install with development dependencies
+pip install -e ".[dev]"
+
+# Install with all optional features
+pip install -e ".[all-crawlers,mcp,caching]"
 ```
+
+### Using Requirements Files
+
+```bash
+# Install core dependencies
+pip install -r requirements.txt
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+```
+
+### Key Dependencies
+
+- **Core**: `aiohttp`, `pydantic`, `beautifulsoup4`, `aiofiles`
+- **PDF Processing**: `pypdf` (replaces deprecated PyPDF2)
+- **Image Processing**: `Pillow`
+- **Data Processing**: `pandas`, `feedparser`
+- **Optional Crawlers**: `firecrawl-py`, `tavily-python`
+- **MCP Support**: `fastmcp`, `websockets`
 
 ## 🔧 Quick Start
 

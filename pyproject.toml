@@ -30,8 +30,10 @@ dependencies = [
     "lxml>=4.9.0",
     "aiofiles>=23.0.0",
     "aioftp>=0.21.0",
+    # MCP Framework
+    "fastmcp>=0.2.0", # Model Context Protocol framework
     # New resource type dependencies
-    "PyPDF2>=3.0.0", # PDF parsing
+    "pypdf>=4.0.0", # PDF parsing
     "Pillow>=10.0.0", # Image processing
     "feedparser>=6.0.0", # RSS/Atom feed parsing
     "pandas>=2.0.0", # CSV parsing and data handling
@@ -42,6 +44,18 @@ dependencies = [
     "playwright>=1.40.0", # JavaScript-rendered content support
     "tavily-python>=0.7.10",
     "firecrawl-py>=2.16.3",
+    # WebSocket support
+    "websockets>=12.0",
+    # GraphQL support
+    "gql>=3.4.0",
+    "aiohttp-graphql>=1.2.0",
+    # Enhanced authentication
+    "authlib>=1.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    # Additional utilities
+    "jsonpath-ng>=1.6.0", # JSON path extraction
+    "python-multipart>=0.0.6", # File upload support
+    "aioredis>=2.0.0", # Redis caching (optional)
 ]
 
 [project.optional-dependencies]
@@ -60,13 +74,30 @@ dev = [
     "flake8>=6.0.0",
     "pre-commit>=3.0.0",
 ]
+mcp = [
+    "fastmcp>=0.2.0",           # MCP framework
+    "websockets>=12.0",         # WebSocket support
+    "gql>=3.4.0",               # GraphQL client
+    "aiohttp-graphql>=1.2.0",   # GraphQL server support
+    "authlib>=1.2.0",           # Enhanced authentication
+    "python-jose[cryptography]>=3.3.0",  # JWT handling
+    "jsonpath-ng>=1.6.0",       # JSON path extraction
+    "python-multipart>=0.0.6",  # File upload support
+]
 crawlers = [
     "firecrawl-py>=0.0.16",     # Firecrawl API SDK
     "tavily-python>=0.3.0",    # Tavily API SDK
     "requests>=2.31.0",        # For Spider.cloud and AnyCrawl HTTP requests
 ]
+caching = [
+    "aioredis>=2.0.0",         # Redis caching
+    "diskcache>=5.6.0",        # Disk-based caching
+]
 all-crawlers = [
     "web-fetch[crawlers]",
+]
+all-features = [
+    "web-fetch[mcp,crawlers,caching]",
 ]
 
 [project.scripts]
@@ -145,6 +176,14 @@ module = [
     "firecrawl.*",
     "aioredis.*",
     "redis.*",
+    "fastmcp.*",
+    "websockets.*",
+    "gql.*",
+    "authlib.*",
+    "jose.*",
+    "multipart.*",
+    "diskcache.*",
+    "pypdf.*",
 ]
 ignore_missing_imports = true
 

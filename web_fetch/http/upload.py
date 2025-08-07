@@ -53,7 +53,7 @@ class UploadProgress(BaseModel):
 class FileUploadHandler:
     """Handler for file uploads."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize file upload handler."""
         pass
 

@@ -12,7 +12,7 @@ from typing import Any, Callable, List, Optional
 
 from pydantic import HttpUrl
 
-from ..models import (
+from web_fetch.models import (
     BatchFetchRequest,
     BatchFetchResult,
     ContentType,
@@ -24,8 +24,8 @@ from ..models import (
     StreamRequest,
     StreamResult,
 )
-from .core_fetcher import WebFetcher
-from .streaming_fetcher import StreamingWebFetcher
+from web_fetch.core_fetcher import WebFetcher
+from web_fetch.streaming_fetcher import StreamingWebFetcher
 
 
 async def fetch_url(
@@ -264,8 +264,8 @@ async def fetch_with_cache(
         )
         ```
     """
-    from ..models import CacheConfig
-    from ..utils import SimpleCache
+    from web_fetch.models import CacheConfig
+    from web_fetch.utils import SimpleCache
 
     if cache_config is None:
         cache_config = CacheConfig()

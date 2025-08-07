@@ -11,12 +11,13 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import aiohttp
 
 from ..auth import AuthManager
-from ..exceptions import WebFetchError
+# Removed unused import that caused unresolved reference
+# from ..exceptions import WebFetchError
 from .models import (
     GraphQLConfig,
     GraphQLError,
@@ -125,17 +126,25 @@ class GraphQLClient:
         self._schema: Optional[GraphQLSchema] = None
         self._schema_cache_time: Optional[float] = None
         self._validator: Optional[GraphQLValidator] = None
-        self._response_cache: Dict[str, Any] = {}
+        # Cache maps key -> (timestamp, GraphQLResult)
+        self._response_cache: Dict[str, Tuple[float, GraphQLResult]] = {}
         self._batch_queue: List[GraphQLQuery] = []
         self._batch_task: Optional[asyncio.Task] = None
 
-    async def __aenter__(self) -> GraphQLClient:
+    async def __aenter__(self) -> "GraphQLClient":
         """Async context manager entry."""
         await self._create_session()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        _exc_type: Optional[type[BaseException]],
+        _exc_val: Optional[BaseException],
+        _exc_tb: Optional[Any],
+    ) -> None:
         """Async context manager exit."""
+        # Reference parameters to silence linters complaining about unused variables
+        _ = (_exc_type, _exc_val, _exc_tb)
         await self._close_session()
 
     async def _create_session(self) -> None:
@@ -148,7 +157,7 @@ class GraphQLClient:
         """Close HTTP session."""
         if self._session and not self._session.closed:
             await self._session.close()
-            self._session = None
+        self._session = None
 
     async def execute(
         self,
@@ -170,6 +179,9 @@ class GraphQLClient:
         """
         if not self._session:
             await self._create_session()
+        # Guard for type checker/runtime
+        if self._session is None:
+            raise GraphQLError("HTTP session is not initialized")
 
         try:
             # Validate query if enabled
@@ -183,9 +195,8 @@ class GraphQLClient:
                 and isinstance(query, GraphQLQuery)
                 and not isinstance(query, (GraphQLMutation, GraphQLSubscription))
             ):
-
                 cached_result = self._get_cached_response(query)
-                if cached_result:
+                if cached_result is not None:
                     return cached_result
 
             # Execute the operation
@@ -205,7 +216,8 @@ class GraphQLClient:
                     headers.update(auth_result.headers)
 
             # Make request
-            async with self._session.post(
+            session = self._session  # help type checker
+            async with session.post(
                 str(self.config.endpoint), json=request_data, headers=headers
             ) as response:
                 response_time = time.time() - start_time
@@ -271,14 +283,16 @@ class GraphQLClient:
         """
         if not self.config.enable_query_batching:
             # Execute queries individually
-            results = []
+            single_results: List[GraphQLResult] = []
             for query in queries:
                 result = await self.execute(query)
-                results.append(result)
-            return results
+                single_results.append(result)
+            return single_results
 
         if not self._session:
             await self._create_session()
+        if self._session is None:
+            raise GraphQLError("HTTP session is not initialized")
 
         try:
             # Prepare batch request
@@ -297,7 +311,8 @@ class GraphQLClient:
             start_time = time.time()
 
             # Make batch request
-            async with self._session.post(
+            session = self._session
+            async with session.post(
                 str(self.config.endpoint), json=batch_data, headers=headers
             ) as response:
                 response_time = time.time() - start_time
@@ -312,8 +327,8 @@ class GraphQLClient:
                 if not isinstance(response_data, list):
                     raise GraphQLError("Expected array response for batch request")
 
-                results = []
-                for i, item in enumerate(response_data):
+                results: List[GraphQLResult] = []
+                for item in response_data:
                     result = GraphQLResult(
                         success=response.status == 200 and "errors" not in item,
                         data=item.get("data"),
@@ -323,7 +338,7 @@ class GraphQLClient:
                             if self.config.include_extensions
                             else None
                         ),
-                        response_time=response_time / len(response_data),  # Approximate
+                        response_time=response_time / max(len(response_data), 1),  # Approximate
                         status_code=response.status,
                         headers=dict(response.headers),
                         raw_response=json.dumps(item),
@@ -480,6 +495,7 @@ class GraphQLClient:
         if cached_item:
             cached_time, cached_result = cached_item
             if time.time() - cached_time < self.config.cache_ttl:
+                # cached_result is GraphQLResult by typing above
                 return cached_result
             else:
                 # Remove expired cache entry

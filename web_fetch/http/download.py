@@ -5,7 +5,6 @@ This module provides comprehensive download capabilities including
 resumable downloads, progress tracking, and integrity verification.
 """
 
-import asyncio
 import hashlib
 import time
 from pathlib import Path
@@ -15,7 +14,6 @@ import aiofiles
 import aiohttp
 from pydantic import BaseModel, Field
 
-from ..exceptions import WebFetchError
 from ..models import ProgressInfo
 
 
@@ -113,7 +111,7 @@ class DownloadHandler:
 
         start_time = time.time()
         bytes_downloaded = 0
-        total_bytes = None
+        total_bytes: Optional[int] = None
         hasher = (
             hashlib.new(self.config.checksum_algorithm)
             if self.config.verify_checksum
@@ -149,7 +147,7 @@ class DownloadHandler:
                         bytes_downloaded += len(chunk)
 
                         # Update checksum
-                        if hasher:
+                        if hasher is not None:
                             hasher.update(chunk)
 
                         # Check size limit
@@ -166,20 +164,21 @@ class DownloadHandler:
 
                         # Progress callback
                         if progress_callback:
+                            elapsed = max(time.time() - start_time, 1e-9)
+                            percentage = (
+                                (bytes_downloaded / total_bytes * 100)
+                                if total_bytes
+                                else None
+                            )
                             progress = ProgressInfo(
                                 bytes_downloaded=bytes_downloaded,
                                 total_bytes=total_bytes,
-                                percentage=(
-                                    (bytes_downloaded / total_bytes * 100)
-                                    if total_bytes
-                                    else None
-                                ),
-                                speed_bps=bytes_downloaded / (time.time() - start_time),
+                                percentage=percentage,
                             )
                             progress_callback(progress)
 
-            # Verify checksum
-            if self.config.verify_checksum and self.config.expected_checksum:
+            # Verify checksum if required and possible
+            if self.config.verify_checksum and self.config.expected_checksum and hasher is not None:
                 calculated_checksum = hasher.hexdigest()
                 if calculated_checksum != self.config.expected_checksum:
                     temp_path.unlink(missing_ok=True)
@@ -203,7 +202,7 @@ class DownloadHandler:
                 total_bytes=total_bytes,
                 download_time=download_time,
                 average_speed=average_speed,
-                checksum=hasher.hexdigest() if hasher else None,
+                checksum=(hasher.hexdigest() if hasher is not None else None),
             )
 
         except Exception as e:
@@ -256,7 +255,7 @@ class ResumableDownloadHandler(DownloadHandler):
 
         start_time = time.time()
         bytes_downloaded = existing_size
-        total_bytes = None
+        total_bytes: Optional[int] = None
         hasher = None
 
         # If resuming, we need to recalculate checksum from existing data
@@ -286,7 +285,7 @@ class ResumableDownloadHandler(DownloadHandler):
                     # Server doesn't support range requests, start over
                     existing_size = 0
                     bytes_downloaded = 0
-                    if hasher:
+                    if self.config.verify_checksum:
                         hasher = hashlib.new(self.config.checksum_algorithm)
 
                     content_length = response.headers.get("content-length")
@@ -306,7 +305,7 @@ class ResumableDownloadHandler(DownloadHandler):
                         bytes_downloaded += len(chunk)
 
                         # Update checksum
-                        if hasher:
+                        if hasher is not None:
                             hasher.update(chunk)
 
                         # Check size limit
@@ -322,21 +321,21 @@ class ResumableDownloadHandler(DownloadHandler):
 
                         # Progress callback
                         if progress_callback:
+                            elapsed = max(time.time() - start_time, 1e-9)
+                            percentage = (
+                                (bytes_downloaded / total_bytes * 100)
+                                if total_bytes
+                                else None
+                            )
                             progress = ProgressInfo(
                                 bytes_downloaded=bytes_downloaded,
                                 total_bytes=total_bytes,
-                                percentage=(
-                                    (bytes_downloaded / total_bytes * 100)
-                                    if total_bytes
-                                    else None
-                                ),
-                                speed_bps=(bytes_downloaded - existing_size)
-                                / (time.time() - start_time),
+                                percentage=percentage,
                             )
                             progress_callback(progress)
 
-            # Verify checksum
-            if self.config.verify_checksum and self.config.expected_checksum:
+            # Verify checksum if required and possible
+            if self.config.verify_checksum and self.config.expected_checksum and hasher is not None:
                 calculated_checksum = hasher.hexdigest()
                 if calculated_checksum != self.config.expected_checksum:
                     return DownloadResult(
@@ -357,7 +356,7 @@ class ResumableDownloadHandler(DownloadHandler):
                 total_bytes=total_bytes,
                 download_time=download_time,
                 average_speed=average_speed,
-                checksum=hasher.hexdigest() if hasher else None,
+                checksum=(hasher.hexdigest() if hasher is not None else None),
             )
 
         except Exception as e:
@@ -386,9 +385,9 @@ class ResumableDownloadHandler(DownloadHandler):
             async with session.head(url, headers=headers) as response:
                 response.raise_for_status()
 
-                info = {
+                info: dict = {
                     "supports_range": "accept-ranges" in response.headers,
-                    "content_length": None,
+                    "content_length": None,  # will become Optional[int]
                     "content_type": response.headers.get("content-type"),
                     "last_modified": response.headers.get("last-modified"),
                     "etag": response.headers.get("etag"),
@@ -396,6 +395,7 @@ class ResumableDownloadHandler(DownloadHandler):
 
                 content_length = response.headers.get("content-length")
                 if content_length:
+                    # assign as int; callers should expect Optional[int]
                     info["content_length"] = int(content_length)
 
                 return info

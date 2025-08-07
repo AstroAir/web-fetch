@@ -8,8 +8,7 @@ commonly used in REST APIs.
 import re
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Union
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -100,45 +99,26 @@ class BasePaginationHandler(ABC):
     ) -> Optional[FetchRequest]:
         """
         Get the next request for pagination.
-
-        Args:
-            base_request: Base request template
-            current_response: Current page response
-            page_number: Current page number
-
-        Returns:
-            Next request or None if no more pages
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def extract_data(self, response: FetchResult) -> List[Any]:
         """
         Extract data from response.
-
-        Args:
-            response: Response to extract data from
-
-        Returns:
-            List of data items
         """
-        pass
+        raise NotImplementedError
 
     def extract_total_count(self, response: FetchResult) -> Optional[int]:
         """
         Extract total count from response.
-
-        Args:
-            response: Response to extract total from
-
-        Returns:
-            Total count or None
         """
         if not self.config.total_field or not response.content:
             return None
 
         if isinstance(response.content, dict):
-            return response.content.get(self.config.total_field)
+            total = response.content.get(self.config.total_field)
+            return int(total) if isinstance(total, (int, str)) and str(total).isdigit() else None
 
         return None
 
@@ -167,7 +147,7 @@ class OffsetLimitHandler(BasePaginationHandler):
 
         # Create new request with updated parameters
         new_request = base_request.model_copy()
-        params = dict(new_request.params or {})
+        params: Dict[str, str] = dict(new_request.params or {})
         params[self.config.offset_param] = str(offset)
         params[self.config.limit_param] = str(self.config.page_size)
         new_request.params = params
@@ -179,11 +159,17 @@ class OffsetLimitHandler(BasePaginationHandler):
         if not response.content:
             return []
 
-        if isinstance(response.content, list):
-            return response.content
+        # Handle list content directly
+        content = response.content
+        if hasattr(content, '__iter__') and not isinstance(content, (str, bytes, dict)):
+            # This is likely a list
+            return list(content)
 
-        if isinstance(response.content, dict):
-            return response.content.get(self.config.data_field, [])
+        # Handle dict content
+        if isinstance(content, dict):
+            data = content.get(self.config.data_field, [])
+            if hasattr(data, '__iter__') and not isinstance(data, (str, bytes, dict)):
+                return list(data)
 
         return []
 
@@ -211,13 +197,13 @@ class PageSizeHandler(BasePaginationHandler):
             if (
                 isinstance(current_response.content, dict)
                 and self.config.has_more_field
-                and not current_response.content.get(self.config.has_more_field, True)
+                and not bool(current_response.content.get(self.config.has_more_field, True))
             ):
                 return None
 
         # Create new request with updated parameters
         new_request = base_request.model_copy()
-        params = dict(new_request.params or {})
+        params: Dict[str, str] = dict(new_request.params or {})
         params[self.config.page_param] = str(page_number)
         params[self.config.size_param] = str(self.config.page_size)
         new_request.params = params
@@ -229,11 +215,17 @@ class PageSizeHandler(BasePaginationHandler):
         if not response.content:
             return []
 
-        if isinstance(response.content, list):
-            return response.content
+        # Handle list content directly
+        content = response.content
+        if hasattr(content, '__iter__') and not isinstance(content, (str, bytes, dict)):
+            # This is likely a list
+            return list(content)
 
-        if isinstance(response.content, dict):
-            return response.content.get(self.config.data_field, [])
+        # Handle dict content
+        if isinstance(content, dict):
+            data = content.get(self.config.data_field, [])
+            if hasattr(data, '__iter__') and not isinstance(data, (str, bytes, dict)):
+                return list(data)
 
         return []
 
@@ -264,12 +256,12 @@ class CursorHandler(BasePaginationHandler):
 
         # Create new request with cursor
         new_request = base_request.model_copy()
-        params = dict(new_request.params or {})
+        params: Dict[str, str] = dict(new_request.params or {})
 
         if self._current_cursor:
             params[self.config.cursor_param] = self._current_cursor
 
-        params[self.config.size_param] = self.config.page_size
+        params[self.config.size_param] = str(self.config.page_size)
         new_request.params = params
 
         return new_request
@@ -279,11 +271,17 @@ class CursorHandler(BasePaginationHandler):
         if not response.content:
             return []
 
-        if isinstance(response.content, list):
-            return response.content
+        # Handle list content directly
+        content = response.content
+        if hasattr(content, '__iter__') and not isinstance(content, (str, bytes, dict)):
+            # This is likely a list
+            return list(content)
 
-        if isinstance(response.content, dict):
-            return response.content.get(self.config.data_field, [])
+        # Handle dict content
+        if isinstance(content, dict):
+            data = content.get(self.config.data_field, [])
+            if hasattr(data, '__iter__') and not isinstance(data, (str, bytes, dict)):
+                return list(data)
 
         return []
 
@@ -293,7 +291,8 @@ class CursorHandler(BasePaginationHandler):
             return None
 
         if self.config.next_cursor_field:
-            return response.content.get(self.config.next_cursor_field)
+            next_cursor = response.content.get(self.config.next_cursor_field)
+            return str(next_cursor) if next_cursor is not None else None
 
         return None
 
@@ -316,9 +315,8 @@ class LinkHeaderHandler(BasePaginationHandler):
         if not next_url:
             return None
 
-        # Create new request with next URL
-        new_request = base_request.model_copy()
-        new_request.url = next_url
+        # Create new request with next URL (use update to enforce type validation)
+        new_request = base_request.model_copy(update={"url": next_url})
 
         return new_request
 
@@ -327,11 +325,17 @@ class LinkHeaderHandler(BasePaginationHandler):
         if not response.content:
             return []
 
-        if isinstance(response.content, list):
-            return response.content
+        # Handle list content directly
+        content = response.content
+        if hasattr(content, '__iter__') and not isinstance(content, (str, bytes, dict)):
+            # This is likely a list
+            return list(content)
 
-        if isinstance(response.content, dict):
-            return response.content.get(self.config.data_field, [])
+        # Handle dict content
+        if isinstance(content, dict):
+            data = content.get(self.config.data_field, [])
+            if hasattr(data, '__iter__') and not isinstance(data, (str, bytes, dict)):
+                return list(data)
 
         return []
 
@@ -347,7 +351,7 @@ class LinkHeaderHandler(BasePaginationHandler):
 
     def _parse_link_header(self, link_header: str) -> Dict[str, str]:
         """Parse Link header into dictionary."""
-        links = {}
+        links: Dict[str, str] = {}
 
         # Split by comma and parse each link
         for link in link_header.split(","):
@@ -363,6 +367,10 @@ class LinkHeaderHandler(BasePaginationHandler):
                 links[rel] = url
 
         return links
+
+
+class _FetcherProto(Protocol):
+    async def fetch_single(self, request: FetchRequest) -> FetchResult: ...
 
 
 class PaginationHandler:
@@ -384,17 +392,10 @@ class PaginationHandler:
         }
 
     async def fetch_all_pages(
-        self, fetcher, base_request: FetchRequest
+        self, fetcher: _FetcherProto, base_request: FetchRequest
     ) -> PaginationResult:
         """
         Fetch all pages using the configured strategy.
-
-        Args:
-            fetcher: WebFetcher instance
-            base_request: Base request template
-
-        Returns:
-            Pagination result with all data
         """
         if self.config.strategy not in self._handlers:
             raise WebFetchError(
@@ -405,7 +406,7 @@ class PaginationHandler:
         result = PaginationResult()
 
         page_number = 1
-        current_response = None
+        current_response: Optional[FetchResult] = None
 
         while page_number <= self.config.max_pages:
             # Get next request

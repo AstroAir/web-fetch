@@ -8,13 +8,11 @@ and validation for FTP downloads with multiple verification methods.
 from __future__ import annotations
 
 import hashlib
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import aiofiles
 
-from ..exceptions import FTPVerificationError
 from .models import (
     FTPConfig,
     FTPFileInfo,
@@ -68,31 +66,33 @@ class FTPVerificationManager:
             )
 
         try:
-            if self.config.verification_method == FTPVerificationMethod.SIZE:
+            method = self.config.verification_method
+
+            if method == FTPVerificationMethod.SIZE:
                 return await self._verify_size(local_path, file_info)
 
-            elif self.config.verification_method == FTPVerificationMethod.MD5:
+            if method == FTPVerificationMethod.MD5:
                 return await self._verify_checksum(
                     local_path,
                     "md5",
                     expected_checksums.get("md5") if expected_checksums else None,
                 )
 
-            elif self.config.verification_method == FTPVerificationMethod.SHA256:
+            if method == FTPVerificationMethod.SHA256:
                 return await self._verify_checksum(
                     local_path,
                     "sha256",
                     expected_checksums.get("sha256") if expected_checksums else None,
                 )
 
-            else:
-                return FTPVerificationResult(
-                    method=self.config.verification_method,
-                    expected_value=None,
-                    actual_value=None,
-                    is_valid=False,
-                    error=f"Unsupported verification method: {self.config.verification_method}",
-                )
+            # Fallback for any future/unknown method values
+            return FTPVerificationResult(
+                method=method,
+                expected_value=None,
+                actual_value=None,
+                is_valid=False,
+                error=f"Unsupported verification method: {method}",
+            )
 
         except Exception as e:
             return FTPVerificationResult(
@@ -186,7 +186,10 @@ class FTPVerificationManager:
 
             # Read file and calculate hash
             async with aiofiles.open(local_path, "rb") as f:
-                while chunk := await f.read(self.config.chunk_size):
+                while True:
+                    chunk = await f.read(self.config.chunk_size)
+                    if not chunk:
+                        break
                     hash_func.update(chunk)
 
             actual_checksum = hash_func.hexdigest().lower()
@@ -313,7 +316,10 @@ class FTPVerificationManager:
             raise ValueError(f"Unsupported hash algorithm: {algorithm}")
 
         async with aiofiles.open(file_path, "rb") as f:
-            while chunk := await f.read(8192):
+            while True:
+                chunk = await f.read(8192)
+                if not chunk:
+                    break
                 hash_func.update(chunk)
 
         return hash_func.hexdigest().lower()

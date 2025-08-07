@@ -27,7 +27,7 @@ from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from aiohttp.resolver import AsyncResolver
 from bs4 import BeautifulSoup
 
-from ..exceptions import (
+from web_fetch.exceptions import (
     ContentError,
     ErrorHandler,
     HTTPError,
@@ -35,7 +35,7 @@ from ..exceptions import (
     TimeoutError,
     WebFetchError,
 )
-from ..models import (
+from web_fetch.models import (
     BatchFetchRequest,
     BatchFetchResult,
     ContentType,
@@ -44,15 +44,15 @@ from ..models import (
     FetchResult,
     RetryStrategy,
 )
-from ..utils.advanced_rate_limiter import AdvancedRateLimiter, RateLimitConfig
-from ..utils.cache import EnhancedCache, EnhancedCacheConfig
-from ..utils.circuit_breaker import CircuitBreakerConfig, with_circuit_breaker
-from ..utils.content_detector import ContentTypeDetector
-from ..utils.deduplication import RequestKey, deduplicate_request
-from ..utils.error_handler import EnhancedErrorHandler, RetryConfig
-from ..utils.js_renderer import JavaScriptRenderer, JSRenderConfig
-from ..utils.metrics import record_request_metrics
-from ..utils.transformers import TransformationPipeline, Transformer
+from web_fetch.utils.advanced_rate_limiter import AdvancedRateLimiter, RateLimitConfig
+from web_fetch.utils.cache import EnhancedCache, EnhancedCacheConfig
+from web_fetch.utils.circuit_breaker import CircuitBreakerConfig, with_circuit_breaker
+from web_fetch.utils.content_detector import ContentTypeDetector
+from web_fetch.utils.deduplication import RequestKey, deduplicate_request
+from web_fetch.utils.error_handler import EnhancedErrorHandler, RetryConfig
+from web_fetch.utils.js_renderer import JavaScriptRenderer, JSRenderConfig
+from web_fetch.utils.metrics import record_request_metrics
+from web_fetch.utils.transformers import TransformationPipeline, Transformer
 
 logger = logging.getLogger(__name__)
 
@@ -755,7 +755,7 @@ class WebFetcher:
         ) as response:
             # Check for server errors that should be retried
             if response.status >= 500:
-                from ..exceptions import ServerError
+                from web_fetch.exceptions import ServerError
 
                 raise ServerError(
                     f"Server error: {response.status} {response.reason}",
@@ -769,7 +769,7 @@ class WebFetcher:
 
             # Check response size
             if len(content_bytes) > self.config.max_response_size:
-                from ..exceptions import ContentError
+                from web_fetch.exceptions import ContentError
 
                 raise ContentError(
                     f"Response size {len(content_bytes)} exceeds maximum {self.config.max_response_size}",
@@ -880,7 +880,7 @@ class WebFetcher:
                     return json.loads(text_content)
                 except (UnicodeDecodeError, json.JSONDecodeError) as e:
                     # Provide specific error information for debugging
-                    from ..exceptions import ContentError
+                    from web_fetch.exceptions import ContentError
 
                     raise ContentError(
                         f"Failed to parse JSON content: {e}",
@@ -936,7 +936,7 @@ class WebFetcher:
             ):
                 # For new content types, use the enhanced parser
                 try:
-                    from ..parsers import EnhancedContentParser
+                    from web_fetch.parsers import EnhancedContentParser
 
                     parser = EnhancedContentParser()
                     parsed_content, enhanced_result = await parser.parse_content(

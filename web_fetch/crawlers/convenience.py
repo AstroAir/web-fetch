@@ -57,7 +57,7 @@ async def crawler_fetch_url(
     """
     if not use_crawler:
         # Fall back to standard WebFetcher
-        from ..src.convenience import fetch_url
+        from ..convenience import fetch_url
 
         # Convert HttpUrl to string if needed
         url_str = str(url) if isinstance(url, HttpUrl) else url
@@ -91,7 +91,7 @@ async def crawler_fetch_url(
 
     except Exception:
         # Fall back to standard WebFetcher on crawler failure
-        from ..src.convenience import fetch_url
+        from ..convenience import fetch_url
 
         # Convert HttpUrl to string if needed
         url_str = str(url) if isinstance(url, HttpUrl) else url
@@ -124,7 +124,7 @@ async def crawler_fetch_urls(
     """
     if not use_crawler:
         # Fall back to standard WebFetcher
-        from ..src.convenience import fetch_urls
+        from ..convenience import fetch_urls
 
         # Convert HttpUrl objects to strings if needed
         url_strings = [str(url) if isinstance(url, HttpUrl) else url for url in urls]

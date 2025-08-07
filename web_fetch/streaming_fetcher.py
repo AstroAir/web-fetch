@@ -15,15 +15,15 @@ from typing import Callable, Optional, Union
 import aiofiles
 from aiohttp import ClientTimeout
 
-from ..exceptions import WebFetchError
-from ..models import (
+from web_fetch.exceptions import WebFetchError
+from web_fetch.models import (
     FetchConfig,
     ProgressInfo,
     StreamRequest,
     StreamResult,
 )
-from ..utils import RateLimiter, SimpleCache
-from .core_fetcher import WebFetcher
+from web_fetch.utils import RateLimiter, SimpleCache
+from web_fetch.core_fetcher import WebFetcher
 
 
 class StreamingWebFetcher(WebFetcher):

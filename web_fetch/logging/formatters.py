@@ -9,7 +9,6 @@ import json
 import logging
 import sys
 from datetime import datetime
-from typing import Any, Dict
 
 
 class StructuredFormatter(logging.Formatter):
@@ -165,13 +164,17 @@ class PerformanceFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with performance info."""
-        # Add duration if available
+        # Ensure duration is present
         if not hasattr(record, "duration"):
             record.duration = 0
 
-        # Add memory usage if available
-        if hasattr(record, "memory_mb"):
-            record.message = f"{record.getMessage()} (mem: {record.memory_mb}MB)"
+        # Append memory usage if provided via extra=...
+        memory_mb = getattr(record, "memory_mb", None)
+        if memory_mb is not None:
+            # Safely augment the message without mutating record.message attribute
+            original_msg = record.getMessage()
+            record.msg = f"{original_msg} (mem: {memory_mb}MB)"
+            record.args = ()
 
         return super().format(record)
 

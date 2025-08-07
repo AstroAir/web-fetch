@@ -11,7 +11,7 @@ import time
 from typing import Callable, Dict, List, Optional, Set
 
 from ..models import FetchConfig
-from ..src.core_fetcher import WebFetcher
+from ..core_fetcher import WebFetcher
 from .models import BatchConfig, BatchRequest, BatchResult, BatchStatus
 
 logger = logging.getLogger(__name__)

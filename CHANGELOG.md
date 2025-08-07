@@ -14,19 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD workflows for testing and releases
 - Issue and PR templates
 - Comprehensive .gitignore for Python projects
+- `requirements.txt` and `requirements-dev.txt` for broader compatibility
+- Enhanced mypy configuration with pypdf support
 
 ### Changed
+- **BREAKING**: Replaced deprecated PyPDF2 with pypdf library for PDF parsing
 - Reorganized codebase structure for better maintainability
+- Moved core functionality from `web_fetch/src/` to main package directory
 - Moved FTP functionality to dedicated `web_fetch/ftp/` module
 - Consolidated CLI into `web_fetch/cli/` module
-- Removed redundant files and directories (`legacy/`, `protocols/`, duplicate model files)
-- Moved utility scripts to examples directory
+- Moved loose test files from root to `tests/` directory
+- Moved main demo script to `examples/` directory
+- Updated all imports to use absolute imports for better maintainability
+- Enhanced project structure following Python best practices
 
 ### Removed
+- Redundant `web_fetch/src/` directory structure
 - Redundant `fetcher_original.py` file
 - Duplicate `models.py` and `utils.py` files in root
 - Legacy compatibility module
 - Protocols directory (consolidated into main structure)
+- Loose test files from project root
 
 ## [0.1.0] - 2024-01-01
 
