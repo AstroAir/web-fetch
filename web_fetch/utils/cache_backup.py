@@ -20,11 +20,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 try:
     import redis.asyncio as redis
+
     HAS_REDIS = True
 except ImportError:
     HAS_REDIS = False
@@ -59,7 +60,7 @@ class SimpleCache:
         self.config = config
         self._cache: Dict[str, CacheEntry] = {}
         self._access_order: List[str] = []
-    
+
     def _cleanup_expired(self) -> None:
         """
         Remove expired entries from cache.
@@ -67,10 +68,7 @@ class SimpleCache:
         Scans all cache entries and removes those that have exceeded
         their TTL. Called automatically during get operations.
         """
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired]
         for key in expired_keys:
             self._remove_entry(key)
 
@@ -96,38 +94,40 @@ class SimpleCache:
         while len(self._cache) >= self.config.max_size and self._access_order:
             lru_key = self._access_order.pop(0)
             self._remove_entry(lru_key)
-    
+
     def get(self, url: str) -> Optional[CacheEntry]:
         """
         Get cached entry for URL.
-        
+
         Args:
             url: URL to look up
-            
+
         Returns:
             CacheEntry if found and not expired, None otherwise
         """
         self._cleanup_expired()
-        
+
         if url not in self._cache:
             return None
-        
+
         entry = self._cache[url]
         if entry.is_expired:
             self._remove_entry(url)
             return None
-        
+
         # Update access order
         if url in self._access_order:
             self._access_order.remove(url)
         self._access_order.append(url)
-        
+
         return entry
-    
-    def put(self, url: str, response_data: Any, headers: Dict[str, str], status_code: int) -> None:
+
+    def put(
+        self, url: str, response_data: Any, headers: Dict[str, str], status_code: int
+    ) -> None:
         """
         Store response in cache.
-        
+
         Args:
             url: URL to cache
             response_data: Response data to cache
@@ -136,18 +136,18 @@ class SimpleCache:
         """
         self._cleanup_expired()
         self._evict_lru()
-        
+
         # Compress data if enabled
         compressed = False
         if self.config.enable_compression and isinstance(response_data, (str, bytes)):
             try:
                 if isinstance(response_data, str):
-                    response_data = response_data.encode('utf-8')
+                    response_data = response_data.encode("utf-8")
                 response_data = gzip.compress(response_data)
                 compressed = True
             except Exception:
                 pass  # Fall back to uncompressed
-        
+
         entry = CacheEntry(
             url=url,
             response_data=response_data,
@@ -155,19 +155,19 @@ class SimpleCache:
             status_code=status_code,
             timestamp=datetime.now(),
             ttl=timedelta(seconds=self.config.ttl_seconds),
-            compressed=compressed
+            compressed=compressed,
         )
-        
+
         self._cache[url] = entry
         if url in self._access_order:
             self._access_order.remove(url)
         self._access_order.append(url)
-    
+
     def clear(self) -> None:
         """Clear all cache entries."""
         self._cache.clear()
         self._access_order.clear()
-    
+
     def size(self) -> int:
         """Get current cache size."""
         return len(self._cache)
@@ -175,8 +175,10 @@ class SimpleCache:
 
 # Enhanced Cache Implementation
 
+
 class CacheBackend(str, Enum):
     """Cache backend types."""
+
     MEMORY = "memory"
     FILE = "file"
     REDIS = "redis"
@@ -322,10 +324,7 @@ class MemoryCacheBackend(CacheBackendInterface):
             return
 
         # Sort by last accessed time and remove oldest entries
-        sorted_entries = sorted(
-            self.cache.items(),
-            key=lambda x: x[1].last_accessed
-        )
+        sorted_entries = sorted(self.cache.items(), key=lambda x: x[1].last_accessed)
 
         # Remove 20% of entries
         num_to_remove = max(1, len(sorted_entries) // 5)
@@ -346,17 +345,18 @@ class EnhancedCache:
         self.config = config or EnhancedCacheConfig()
         self.backend = self._create_backend()
         self.stats = {
-            'hits': 0,
-            'misses': 0,
-            'sets': 0,
-            'deletes': 0,
-            'evictions': 0,
+            "hits": 0,
+            "misses": 0,
+            "sets": 0,
+            "deletes": 0,
+            "evictions": 0,
         }
 
         # Start cleanup task
         self._cleanup_task = None
         if self.config.cleanup_interval > 0:
             self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
 
 class FileCacheBackend(CacheBackendInterface):
     """File-based cache backend with persistent storage."""
@@ -369,42 +369,50 @@ class FileCacheBackend(CacheBackendInterface):
 
     async def get(self, key: str) -> Optional[EnhancedCacheEntry]:
         """Get cache entry by key from file."""
-        cache_file = self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()}.cache"
-        
+        cache_file = (
+            self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()}.cache"
+        )
+
         async with self._lock:
             try:
                 if not cache_file.exists():
                     return None
-                
+
                 import aiofiles
-                async with aiofiles.open(cache_file, 'rb') as f:
+
+                async with aiofiles.open(cache_file, "rb") as f:
                     import pickle
+
                     entry = pickle.loads(await f.read())
-                    
+
                 if not entry.is_expired:
                     entry.hit_count += 1
                     entry.last_accessed = time.time()
                     # Write back updated entry
-                    async with aiofiles.open(cache_file, 'wb') as f:
+                    async with aiofiles.open(cache_file, "wb") as f:
                         await f.write(pickle.dumps(entry))
                     return entry
                 else:
                     # Remove expired entry
                     cache_file.unlink(missing_ok=True)
                     return None
-                    
+
             except Exception:
                 return None
 
     async def set(self, entry: EnhancedCacheEntry) -> bool:
         """Set cache entry to file."""
-        cache_file = self.cache_dir / f"{hashlib.sha256(entry.key.encode()).hexdigest()}.cache"
-        
+        cache_file = (
+            self.cache_dir / f"{hashlib.sha256(entry.key.encode()).hexdigest()}.cache"
+        )
+
         async with self._lock:
             try:
-                import aiofiles
                 import pickle
-                async with aiofiles.open(cache_file, 'wb') as f:
+
+                import aiofiles
+
+                async with aiofiles.open(cache_file, "wb") as f:
                     await f.write(pickle.dumps(entry))
                 return True
             except Exception:
@@ -412,8 +420,10 @@ class FileCacheBackend(CacheBackendInterface):
 
     async def delete(self, key: str) -> bool:
         """Delete cache entry file."""
-        cache_file = self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()}.cache"
-        
+        cache_file = (
+            self.cache_dir / f"{hashlib.sha256(key.encode()).hexdigest()}.cache"
+        )
+
         async with self._lock:
             try:
                 cache_file.unlink(missing_ok=True)
@@ -436,11 +446,13 @@ class FileCacheBackend(CacheBackendInterface):
         async with self._lock:
             keys = []
             try:
-                import aiofiles
                 import pickle
+
+                import aiofiles
+
                 for cache_file in self.cache_dir.glob("*.cache"):
                     try:
-                        async with aiofiles.open(cache_file, 'rb') as f:
+                        async with aiofiles.open(cache_file, "rb") as f:
                             entry = pickle.loads(await f.read())
                             if not entry.is_expired:
                                 keys.append(entry.key)
@@ -469,53 +481,62 @@ class RedisCacheBackend(CacheBackendInterface):
         if self._redis is None:
             try:
                 import aioredis
+
                 self._redis = await aioredis.from_url(
                     self.config.redis_url or "redis://localhost:6379",
-                    decode_responses=False
+                    decode_responses=False,
                 )
             except ImportError:
-                raise ImportError("aioredis is required for Redis cache backend. Install with: pip install aioredis")
+                raise ImportError(
+                    "aioredis is required for Redis cache backend. Install with: pip install aioredis"
+                )
         return self._redis
 
     async def get(self, key: str) -> Optional[EnhancedCacheEntry]:
         """Get cache entry from Redis."""
         redis_key = f"{self.config.redis_prefix}{key}"
-        
+
         async with self._lock:
             try:
                 redis = await self._get_redis()
                 data = await redis.get(redis_key)
-                
+
                 if data:
                     import pickle
+
                     entry = pickle.loads(data)
-                    
+
                     if not entry.is_expired:
                         entry.hit_count += 1
                         entry.last_accessed = time.time()
                         # Update in Redis
-                        await redis.set(redis_key, pickle.dumps(entry), ex=int(entry.ttl) if entry.ttl else None)
+                        await redis.set(
+                            redis_key,
+                            pickle.dumps(entry),
+                            ex=int(entry.ttl) if entry.ttl else None,
+                        )
                         return entry
                     else:
                         # Remove expired entry
                         await redis.delete(redis_key)
                         return None
-                        
+
             except Exception:
                 return None
 
     async def set(self, entry: EnhancedCacheEntry) -> bool:
         """Set cache entry in Redis."""
         redis_key = f"{self.config.redis_prefix}{entry.key}"
-        
+
         async with self._lock:
             try:
                 redis = await self._get_redis()
                 import pickle
+
                 await redis.set(
-                    redis_key, 
-                    pickle.dumps(entry), 
-                    ex=int(entry.ttl) if entry.ttl else None
+                    redis_key,
+                    pickle.dumps(entry),
+                    ex=int(entry.ttl) if entry.ttl else None,
                 )
                 return True
             except Exception:
@@ -524,7 +545,7 @@ class RedisCacheBackend(CacheBackendInterface):
     async def delete(self, key: str) -> bool:
         """Delete cache entry from Redis."""
         redis_key = f"{self.config.redis_prefix}{key}"
-        
+
         async with self._lock:
             try:
                 redis = await self._get_redis()
@@ -551,7 +572,10 @@ class RedisCacheBackend(CacheBackendInterface):
             try:
                 redis = await self._get_redis()
                 redis_keys = await redis.keys(f"{self.config.redis_prefix}*")
-                return [key.decode().replace(self.config.redis_prefix, '') for key in redis_keys]
+                return [
+                    key.decode().replace(self.config.redis_prefix, "")
+                    for key in redis_keys
+                ]
             except Exception:
                 return []
 
@@ -570,7 +594,6 @@ class RedisCacheBackend(CacheBackendInterface):
         if self._redis:
             await self._redis.close()
 
-
     def _create_backend(self) -> CacheBackendInterface:
         """Create appropriate cache backend."""
         if self.config.backend == CacheBackend.MEMORY:
@@ -582,19 +605,27 @@ class RedisCacheBackend(CacheBackendInterface):
         else:
             raise ValueError(f"Unknown cache backend: {self.config.backend}")
 
-    async def get(self, url: str, headers: Optional[Dict[str, str]] = None) -> Optional[Any]:
+    async def get(
+        self, url: str, headers: Optional[Dict[str, str]] = None
+    ) -> Optional[Any]:
         """Get cached response for URL."""
         key = self._generate_key(url, headers)
         entry = await self.backend.get(key)
 
         if entry:
-            self.stats['hits'] += 1
+            self.stats["hits"] += 1
             return entry.data
         else:
-            self.stats['misses'] += 1
+            self.stats["misses"] += 1
             return None
 
-    async def set(self, url: str, data: Any, headers: Optional[Dict[str, str]] = None, ttl: Optional[float] = None) -> bool:
+    async def set(
+        self,
+        url: str,
+        data: Any,
+        headers: Optional[Dict[str, str]] = None,
+        ttl: Optional[float] = None,
+    ) -> bool:
         """Cache response for URL."""
         key = self._generate_key(url, headers)
 
@@ -603,15 +634,15 @@ class RedisCacheBackend(CacheBackendInterface):
             data=data,
             timestamp=time.time(),
             ttl=ttl or self.config.default_ttl,
-            etag=headers.get('etag') if headers else None,
-            last_modified=headers.get('last-modified') if headers else None,
-            content_type=headers.get('content-type') if headers else None,
-            size=len(str(data)) if data else 0
+            etag=headers.get("etag") if headers else None,
+            last_modified=headers.get("last-modified") if headers else None,
+            content_type=headers.get("content-type") if headers else None,
+            size=len(str(data)) if data else 0,
         )
 
         success = await self.backend.set(entry)
         if success:
-            self.stats['sets'] += 1
+            self.stats["sets"] += 1
         return success
 
     def _generate_key(self, url: str, headers: Optional[Dict[str, str]] = None) -> str:
@@ -620,13 +651,13 @@ class RedisCacheBackend(CacheBackendInterface):
 
         if headers:
             # Include relevant headers in key
-            relevant_headers = ['authorization', 'accept', 'accept-language']
+            relevant_headers = ["authorization", "accept", "accept-language"]
             for header in relevant_headers:
                 if header in headers:
                     key_parts.append(f"{header}:{headers[header]}")
 
         key_string = "|".join(key_parts)
-        return hashlib.sha256(key_string.encode('utf-8')).hexdigest()
+        return hashlib.sha256(key_string.encode("utf-8")).hexdigest()
 
     async def _cleanup_loop(self) -> None:
         """Background cleanup task."""

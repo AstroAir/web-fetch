@@ -7,8 +7,8 @@ organized by protocol and functionality.
 
 # Import all models for easy access
 from .base import *
-from .http import *
 from .ftp import *
+from .http import *
 
 __all__ = [
     # Base models and types
@@ -16,7 +16,6 @@ __all__ = [
     "RetryStrategy",
     "RequestHeaders",
     "ProgressInfo",
-
     # Resource metadata classes
     "PDFMetadata",
     "ImageMetadata",
@@ -25,7 +24,6 @@ __all__ = [
     "CSVMetadata",
     "LinkInfo",
     "ContentSummary",
-
     # HTTP models
     "FetchConfig",
     "FetchRequest",
@@ -38,7 +36,6 @@ __all__ = [
     "CacheConfig",
     "RateLimitConfig",
     "SessionConfig",
-
     # FTP models
     "FTPConfig",
     "FTPRequest",

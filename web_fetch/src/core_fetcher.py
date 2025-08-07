@@ -9,18 +9,18 @@ Includes enhanced functionality like circuit breakers, deduplication, transforma
 from __future__ import annotations
 
 import asyncio
+import heapq
 import json
 import logging
 import ssl
 import time
-from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union, Callable
 import weakref
-from dataclasses import dataclass, field
 from collections import defaultdict
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
-import heapq
 
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
@@ -44,15 +44,15 @@ from ..models import (
     FetchResult,
     RetryStrategy,
 )
-from ..utils.circuit_breaker import CircuitBreakerConfig, with_circuit_breaker
-from ..utils.deduplication import deduplicate_request, RequestKey
-from ..utils.transformers import TransformationPipeline, Transformer
-from ..utils.metrics import record_request_metrics
-from ..utils.content_detector import ContentTypeDetector
-from ..utils.error_handler import EnhancedErrorHandler, RetryConfig
 from ..utils.advanced_rate_limiter import AdvancedRateLimiter, RateLimitConfig
 from ..utils.cache import EnhancedCache, EnhancedCacheConfig
+from ..utils.circuit_breaker import CircuitBreakerConfig, with_circuit_breaker
+from ..utils.content_detector import ContentTypeDetector
+from ..utils.deduplication import RequestKey, deduplicate_request
+from ..utils.error_handler import EnhancedErrorHandler, RetryConfig
 from ..utils.js_renderer import JavaScriptRenderer, JSRenderConfig
+from ..utils.metrics import record_request_metrics
+from ..utils.transformers import TransformationPipeline, Transformer
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ConnectionPoolStats:
     """Statistics for connection pool monitoring."""
+
     total_connections: int = 0
     active_connections: int = 0
     idle_connections: int = 0
@@ -70,9 +71,10 @@ class ConnectionPoolStats:
     dns_cache_misses: int = 0
 
 
-@dataclass  
+@dataclass
 class RequestPriority:
     """Request priority configuration."""
+
     HIGH = 1
     NORMAL = 2
     LOW = 3
@@ -81,11 +83,12 @@ class RequestPriority:
 @dataclass
 class PriorityRequest:
     """Request with priority for queue processing."""
-    request: 'FetchRequest'
+
+    request: "FetchRequest"
     priority: int
     timestamp: float
     future: asyncio.Future
-    
+
     def __lt__(self, other):
         if self.priority != other.priority:
             return self.priority < other.priority
@@ -94,44 +97,46 @@ class PriorityRequest:
 
 class OptimizedTCPConnector(TCPConnector):
     """Enhanced TCP connector with advanced optimizations."""
-    
+
     def __init__(self, *args, **kwargs):
         # Extract custom parameters
-        self._dns_cache_ttl = kwargs.pop('dns_cache_ttl', 300)
-        self._enable_keepalive = kwargs.pop('enable_keepalive', True)
-        self._keepalive_timeout = kwargs.pop('keepalive_timeout', 30)
-        
+        self._dns_cache_ttl = kwargs.pop("dns_cache_ttl", 300)
+        self._enable_keepalive = kwargs.pop("enable_keepalive", True)
+        self._keepalive_timeout = kwargs.pop("keepalive_timeout", 30)
+
         super().__init__(*args, **kwargs)
-        
+
         # Enhanced connection tracking
         self._connection_stats = ConnectionPoolStats()
         self._dns_cache = {}
         self._last_dns_cleanup = time.time()
-        
+
         # Configure SSL context for better performance
-        if not kwargs.get('ssl', True):
+        if not kwargs.get("ssl", True):
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             # Enable session resumption for faster TLS handshakes
             ssl_context.options |= ssl.OP_NO_COMPRESSION
             self._ssl_context = ssl_context
-    
+
     async def _create_connection(self, req, traces, timeout):
         """Override to add connection tracking."""
         self._connection_stats.connection_creation_count += 1
         host = req.host
-        self._connection_stats.connections_per_host[host] = \
+        self._connection_stats.connections_per_host[host] = (
             self._connection_stats.connections_per_host.get(host, 0) + 1
-        
+        )
+
         return await super()._create_connection(req, traces, timeout)
-    
+
     def _cleanup_dns_cache(self):
         """Cleanup expired DNS entries."""
         current_time = time.time()
         if current_time - self._last_dns_cleanup > 60:  # Cleanup every minute
             expired_keys = [
-                host for host, (_, timestamp) in self._dns_cache.items()
+                host
+                for host, (_, timestamp) in self._dns_cache.items()
                 if current_time - timestamp > self._dns_cache_ttl
             ]
             for key in expired_keys:
@@ -141,67 +146,79 @@ class OptimizedTCPConnector(TCPConnector):
 
 class AdaptiveRetryStrategy:
     """Intelligent retry strategy that adapts based on error patterns."""
-    
+
     def __init__(self):
-        self._host_error_rates = defaultdict(lambda: {'errors': 0, 'requests': 0, 'last_reset': time.time()})
+        self._host_error_rates = defaultdict(
+            lambda: {"errors": 0, "requests": 0, "last_reset": time.time()}
+        )
         self._global_backoff_multiplier = 1.0
-        
-    def should_retry(self, error: Exception, attempt: int, max_retries: int, url: str) -> bool:
+
+    def should_retry(
+        self, error: Exception, attempt: int, max_retries: int, url: str
+    ) -> bool:
         """Determine if request should be retried based on adaptive logic."""
         if attempt >= max_retries:
             return False
-            
+
         # Extract host from URL
         host = urlparse(url).netloc
-        
+
         # Update error statistics
         stats = self._host_error_rates[host]
-        stats['requests'] += 1
-        
+        stats["requests"] += 1
+
         # Reset stats if they're old (every 5 minutes)
-        if time.time() - stats['last_reset'] > 300:
-            stats['errors'] = 0
-            stats['requests'] = 0
-            stats['last_reset'] = time.time()
-        
+        if time.time() - stats["last_reset"] > 300:
+            stats["errors"] = 0
+            stats["requests"] = 0
+            stats["last_reset"] = time.time()
+
         # Don't retry certain error types
         if isinstance(error, (aiohttp.ClientResponseError,)):
-            if hasattr(error, 'status') and error.status in (400, 401, 403, 404, 422):
+            if hasattr(error, "status") and error.status in (400, 401, 403, 404, 422):
                 return False
-        
+
         # Reduce retries for hosts with high error rates
-        if stats['requests'] > 10:
-            error_rate = stats['errors'] / stats['requests']
+        if stats["requests"] > 10:
+            error_rate = stats["errors"] / stats["requests"]
             if error_rate > 0.5:  # More than 50% error rate
                 return attempt < max(1, max_retries // 2)
-        
+
         return True
-    
+
     def calculate_delay(self, attempt: int, base_delay: float, url: str) -> float:
         """Calculate adaptive delay with jitter."""
         host = urlparse(url).netloc
         stats = self._host_error_rates[host]
-        
+
         # Increase delay for problematic hosts
         host_multiplier = 1.0
-        if stats['requests'] > 5:
-            error_rate = stats['errors'] / stats['requests']
-            host_multiplier = 1.0 + (error_rate * 2)  # Up to 3x delay for 100% error rate
-        
+        if stats["requests"] > 5:
+            error_rate = stats["errors"] / stats["requests"]
+            host_multiplier = 1.0 + (
+                error_rate * 2
+            )  # Up to 3x delay for 100% error rate
+
         # Exponential backoff with jitter
-        delay = base_delay * (2 ** attempt) * host_multiplier * self._global_backoff_multiplier
-        
+        delay = (
+            base_delay
+            * (2**attempt)
+            * host_multiplier
+            * self._global_backoff_multiplier
+        )
+
         # Add jitter (±25%)
         import random
+
         jitter = random.uniform(0.75, 1.25)
-        
+
         return min(delay * jitter, 60.0)  # Cap at 60 seconds
-    
+
     def record_error(self, url: str):
         """Record an error for adaptive learning."""
         host = urlparse(url).netloc
-        self._host_error_rates[host]['errors'] += 1
-    
+        self._host_error_rates[host]["errors"] += 1
+
     def record_success(self, url: str):
         """Record a success to help recovery detection."""
         host = urlparse(url).netloc
@@ -281,7 +298,7 @@ class WebFetcher:
                 enable_request_prioritization=True,
                 adaptive_retry=True
             )
-            
+
             requests = [
                 FetchRequest(
                     url=f"https://api.example.com/item/{i}",
@@ -329,7 +346,7 @@ class WebFetcher:
         enable_request_prioritization: bool = False,
         enable_adaptive_retry: bool = True,
         enable_http2: bool = True,
-        dns_cache_ttl: int = 300
+        dns_cache_ttl: int = 300,
     ):
         """
         Initialize the WebFetcher with comprehensive configuration options.
@@ -422,7 +439,7 @@ class WebFetcher:
         self._advanced_rate_limiter = AdvancedRateLimiter()
         self._enhanced_cache = EnhancedCache(cache_config) if cache_config else None
         self._js_renderer = JavaScriptRenderer(js_config) if js_config else None
-    
+
     async def __aenter__(self) -> WebFetcher:
         """
         Async context manager entry.
@@ -451,7 +468,7 @@ class WebFetcher:
             exc_tb: Exception traceback if an exception occurred
         """
         await self.close()
-    
+
     async def _create_session(self) -> None:
         """
         Create aiohttp session with proper configuration.
@@ -465,33 +482,33 @@ class WebFetcher:
         """
         if self._session is not None:
             return
-        
+
         # Configure timeouts
         timeout = ClientTimeout(
             total=self.config.total_timeout,
             connect=self.config.connect_timeout,
-            sock_read=self.config.read_timeout
+            sock_read=self.config.read_timeout,
         )
-        
+
         # Configure TCP connector for connection pooling
         connector = TCPConnector(
             limit=self.config.max_connections_per_host * 10,  # Total connection pool
             limit_per_host=self.config.max_connections_per_host,
             ssl=self.config.verify_ssl,
-            enable_cleanup_closed=True
+            enable_cleanup_closed=True,
         )
-        
+
         # Create session with configuration
         self._session = ClientSession(
             timeout=timeout,
             connector=connector,
             headers=self.config.headers.to_dict(),
-            raise_for_status=False  # We'll handle status codes manually
+            raise_for_status=False,  # We'll handle status codes manually
         )
-        
+
         # Create semaphore for concurrency control
         self._semaphore = asyncio.Semaphore(self.config.max_concurrent_requests)
-    
+
     async def close(self) -> None:
         """Close the session and cleanup resources."""
         if self._session:
@@ -590,12 +607,17 @@ class WebFetcher:
                 last_error = str(web_error)
 
                 # Check if error is retryable
-                if attempt < self.config.max_retries and ErrorHandler.is_retryable_error(web_error):
-                    delay = ErrorHandler.get_retry_delay(web_error, attempt, self.config.retry_delay)
+                if (
+                    attempt < self.config.max_retries
+                    and ErrorHandler.is_retryable_error(web_error)
+                ):
+                    delay = ErrorHandler.get_retry_delay(
+                        web_error, attempt, self.config.retry_delay
+                    )
                     await asyncio.sleep(delay)
                 else:
                     # Final attempt failed or error is not retryable
-                    status_code = getattr(web_error, 'status_code', 0)
+                    status_code = getattr(web_error, "status_code", 0)
                     return FetchResult(
                         url=str(request.url),
                         status_code=status_code,
@@ -605,7 +627,7 @@ class WebFetcher:
                         response_time=time.time() - start_time,
                         timestamp=datetime.now(),
                         error=last_error,
-                        retry_count=attempt
+                        retry_count=attempt,
                     )
 
         # This should never be reached, but included for completeness
@@ -618,10 +640,12 @@ class WebFetcher:
             response_time=time.time() - start_time,
             timestamp=datetime.now(),
             error="Maximum retries exceeded",
-            retry_count=self.config.max_retries
+            retry_count=self.config.max_retries,
         )
 
-    async def _execute_request(self, request: FetchRequest, attempt: int) -> FetchResult:
+    async def _execute_request(
+        self, request: FetchRequest, attempt: int
+    ) -> FetchResult:
         """
         Execute a single HTTP request with enhanced features.
 
@@ -657,8 +681,13 @@ class WebFetcher:
             if cached_result:
                 logger.debug(f"Enhanced cache hit for {url}")
                 if self.enable_metrics:
-                    record_request_metrics(url, request.method, cached_result.status_code,
-                                         time.time() - start_time, 0)
+                    record_request_metrics(
+                        url,
+                        request.method,
+                        cached_result.status_code,
+                        time.time() - start_time,
+                        0,
+                    )
                 return cached_result
 
         # Handle request deduplication
@@ -671,22 +700,26 @@ class WebFetcher:
                 params=request.params,
                 executor_func=self._make_http_request,
                 request=request,
-                attempt=attempt
+                attempt=attempt,
             )
 
             if self.enable_metrics:
-                record_request_metrics(url, request.method, result.status_code,
-                                     time.time() - start_time, 0)
+                record_request_metrics(
+                    url, request.method, result.status_code, time.time() - start_time, 0
+                )
             return result
         else:
             result = await self._make_http_request(request, attempt)
 
             if self.enable_metrics:
-                record_request_metrics(url, request.method, result.status_code,
-                                     time.time() - start_time, 0)
+                record_request_metrics(
+                    url, request.method, result.status_code, time.time() - start_time, 0
+                )
             return result
 
-    async def _make_http_request(self, request: FetchRequest, attempt: int) -> FetchResult:
+    async def _make_http_request(
+        self, request: FetchRequest, attempt: int
+    ) -> FetchResult:
         """Make the actual HTTP request without deduplication."""
         if self._session is None:
             raise WebFetchError("Session not properly initialized")
@@ -696,7 +729,11 @@ class WebFetcher:
         url = str(request.url)
         headers = request.headers or {}
         params = request.params
-        timeout = ClientTimeout(total=request.timeout_override) if request.timeout_override else None
+        timeout = (
+            ClientTimeout(total=request.timeout_override)
+            if request.timeout_override
+            else None
+        )
 
         # Prepare data/json parameters
         json_data = None
@@ -714,16 +751,17 @@ class WebFetcher:
             params=params,
             json=json_data,
             data=data,
-            timeout=timeout
+            timeout=timeout,
         ) as response:
             # Check for server errors that should be retried
             if response.status >= 500:
                 from ..exceptions import ServerError
+
                 raise ServerError(
                     f"Server error: {response.status} {response.reason}",
                     status_code=response.status,
                     url=str(request.url),
-                    headers=dict(response.headers)
+                    headers=dict(response.headers),
                 )
 
             # Read response content
@@ -732,18 +770,16 @@ class WebFetcher:
             # Check response size
             if len(content_bytes) > self.config.max_response_size:
                 from ..exceptions import ContentError
+
                 raise ContentError(
                     f"Response size {len(content_bytes)} exceeds maximum {self.config.max_response_size}",
                     url=str(request.url),
-                    content_length=len(content_bytes)
+                    content_length=len(content_bytes),
                 )
 
             # Parse content based on requested type
             parsed_content = await self._parse_content(
-                content_bytes,
-                request.content_type,
-                url,
-                dict(response.headers)
+                content_bytes, request.content_type, url, dict(response.headers)
             )
 
             result = FetchResult(
@@ -754,14 +790,17 @@ class WebFetcher:
                 content_type=request.content_type,
                 response_time=0.0,  # Will be set by caller
                 timestamp=datetime.now(),
-                retry_count=attempt
+                retry_count=attempt,
             )
 
             # Apply transformation pipeline if configured
             if self.transformation_pipeline:
                 try:
-                    transformation_result = await self.transformation_pipeline.transform(
-                        parsed_content, {"url": url, "headers": dict(response.headers)}
+                    transformation_result = (
+                        await self.transformation_pipeline.transform(
+                            parsed_content,
+                            {"url": url, "headers": dict(response.headers)},
+                        )
                     )
                     if transformation_result.is_success:
                         result.content = transformation_result.data
@@ -779,7 +818,7 @@ class WebFetcher:
         content_bytes: bytes,
         requested_type: ContentType,
         url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None
+        headers: Optional[Dict[str, str]] = None,
     ) -> Union[str, bytes, Dict[str, Any], None]:
         """
         Parse response content based on requested content type.
@@ -819,83 +858,98 @@ class WebFetcher:
                 # Text decoding with fallback encoding detection
                 try:
                     # Try UTF-8 first as it's the most common encoding for web content
-                    return content_bytes.decode('utf-8')
+                    return content_bytes.decode("utf-8")
                 except UnicodeDecodeError:
                     # UTF-8 failed, try common fallback encodings in order of likelihood
                     # This handles legacy content and various regional encodings
-                    for encoding in ['latin1', 'cp1252', 'iso-8859-1']:
+                    for encoding in ["latin1", "cp1252", "iso-8859-1"]:
                         try:
                             return content_bytes.decode(encoding)
                         except UnicodeDecodeError:
                             continue
                     # Last resort: decode with error replacement to avoid complete failure
                     # This ensures we always return something, even if some characters are lost
-                    return content_bytes.decode('utf-8', errors='replace')
+                    return content_bytes.decode("utf-8", errors="replace")
 
             case ContentType.JSON:
                 # JSON parsing with comprehensive error handling
                 try:
                     # First decode bytes to string, then parse JSON
                     # This two-step process allows us to distinguish between encoding and JSON errors
-                    text_content = content_bytes.decode('utf-8')
+                    text_content = content_bytes.decode("utf-8")
                     return json.loads(text_content)
                 except (UnicodeDecodeError, json.JSONDecodeError) as e:
                     # Provide specific error information for debugging
                     from ..exceptions import ContentError
+
                     raise ContentError(
                         f"Failed to parse JSON content: {e}",
-                        content_type="application/json"
+                        content_type="application/json",
                     )
 
             case ContentType.HTML:
                 # HTML parsing with structured data extraction
                 try:
                     # Decode HTML content to string for BeautifulSoup processing
-                    text_content = content_bytes.decode('utf-8')
+                    text_content = content_bytes.decode("utf-8")
 
                     # Use lxml parser for better performance and HTML5 support
                     # Falls back to html.parser if lxml is not available
-                    soup = BeautifulSoup(text_content, 'lxml')
+                    soup = BeautifulSoup(text_content, "lxml")
 
                     # Extract structured data from HTML for common use cases
                     return {
                         # Page title from <title> tag, None if not found
-                        'title': soup.title.string if soup.title else None,
-
+                        "title": soup.title.string if soup.title else None,
                         # Clean text content with whitespace stripped
                         # Useful for content analysis and search indexing
-                        'text': soup.get_text(strip=True),
-
+                        "text": soup.get_text(strip=True),
                         # All links with href attributes - useful for crawling and link analysis
                         # Filter out None values and ensure href attribute exists
-                        'links': [a.get('href') for a in soup.find_all('a', href=True) if hasattr(a, 'get')],
-
+                        "links": [
+                            a.get("href")
+                            for a in soup.find_all("a", href=True)
+                            if hasattr(a, "get")
+                        ],
                         # All images with src attributes - useful for media extraction
                         # Filter out None values and ensure src attribute exists
-                        'images': [img.get('src') for img in soup.find_all('img', src=True) if hasattr(img, 'get')],
-
+                        "images": [
+                            img.get("src")
+                            for img in soup.find_all("img", src=True)
+                            if hasattr(img, "get")
+                        ],
                         # Raw HTML content for cases where full HTML is needed
                         # Useful for custom parsing or HTML transformation
-                        'raw_html': text_content
+                        "raw_html": text_content,
                     }
                 except Exception as e:
                     # Provide specific error context for HTML parsing failures
                     raise WebFetchError(f"Failed to parse HTML content: {e}")
 
-            case ContentType.PDF | ContentType.IMAGE | ContentType.RSS | ContentType.CSV | ContentType.MARKDOWN | ContentType.XML:
+            case (
+                ContentType.PDF
+                | ContentType.IMAGE
+                | ContentType.RSS
+                | ContentType.CSV
+                | ContentType.MARKDOWN
+                | ContentType.XML
+            ):
                 # For new content types, use the enhanced parser
                 try:
                     from ..parsers import EnhancedContentParser
+
                     parser = EnhancedContentParser()
                     parsed_content, enhanced_result = await parser.parse_content(
                         content_bytes, requested_type, url=None, headers=None
                     )
                     return parsed_content
                 except Exception as e:
-                    raise WebFetchError(f"Failed to parse {requested_type} content: {e}")
+                    raise WebFetchError(
+                        f"Failed to parse {requested_type} content: {e}"
+                    )
 
             case _:
-                return content_bytes.decode('utf-8', errors='replace')
+                return content_bytes.decode("utf-8", errors="replace")
 
     def _calculate_retry_delay(self, attempt: int) -> float:
         """
@@ -926,7 +980,7 @@ class WebFetcher:
             case RetryStrategy.LINEAR:
                 return base_delay * (attempt + 1)
             case RetryStrategy.EXPONENTIAL:
-                return base_delay * (2 ** attempt)
+                return base_delay * (2**attempt)
             case _:
                 return base_delay
 
@@ -937,10 +991,12 @@ class WebFetcher:
             url=str(request.url),
             func=self.fetch_single,
             config=self.circuit_breaker_config,
-            request=request
+            request=request,
         )
 
-    async def fetch_with_auto_detection(self, url: str, headers: Optional[Dict[str, str]] = None) -> FetchResult:
+    async def fetch_with_auto_detection(
+        self, url: str, headers: Optional[Dict[str, str]] = None
+    ) -> FetchResult:
         """
         Fetch URL with automatic content type detection.
 
@@ -956,9 +1012,7 @@ class WebFetcher:
         """
         # First fetch with RAW content type to get headers and content
         raw_request = FetchRequest(
-            url=url,
-            headers=headers,
-            content_type=ContentType.RAW
+            url=url, headers=headers, content_type=ContentType.RAW
         )
 
         raw_result = await self.fetch_single(raw_request)
@@ -976,16 +1030,16 @@ class WebFetcher:
                 # Re-parse with detected content type if different
                 if best_content_type != ContentType.RAW:
                     enhanced_request = FetchRequest(
-                        url=url,
-                        headers=headers,
-                        content_type=best_content_type
+                        url=url, headers=headers, content_type=best_content_type
                     )
 
                     enhanced_result = await self.fetch_single(enhanced_request)
                     return enhanced_result
 
             except Exception as e:
-                logger.warning(f"Content type detection failed for {url}, using raw content: {e}")
+                logger.warning(
+                    f"Content type detection failed for {url}, using raw content: {e}"
+                )
 
         return raw_result
 
@@ -1005,10 +1059,7 @@ class WebFetcher:
         start_time = time.time()
 
         # Create tasks for concurrent execution
-        tasks = [
-            self.fetch_single(request)
-            for request in batch_request.requests
-        ]
+        tasks = [self.fetch_single(request) for request in batch_request.requests]
 
         # Execute all requests concurrently
         results = await asyncio.gather(*tasks, return_exceptions=False)

@@ -17,14 +17,14 @@ class URLValidator:
     """Utility class for URL validation and normalization."""
 
     # Common URL schemes
-    VALID_SCHEMES = {'http', 'https', 'ftp', 'ftps'}
+    VALID_SCHEMES = {"http", "https", "ftp", "ftps"}
 
     # Regex patterns for validation
     DOMAIN_PATTERN = re.compile(
-        r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'
+        r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
     )
     IP_PATTERN = re.compile(
-        r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
     )
 
     @classmethod
@@ -51,7 +51,9 @@ class URLValidator:
 
             # Validate hostname format
             hostname = parsed.hostname.lower()
-            if not (cls.DOMAIN_PATTERN.match(hostname) or cls.IP_PATTERN.match(hostname)):
+            if not (
+                cls.DOMAIN_PATTERN.match(hostname) or cls.IP_PATTERN.match(hostname)
+            ):
                 return False
 
             return True
@@ -77,14 +79,18 @@ class URLValidator:
             scheme = parsed.scheme.lower()
 
             # Normalize hostname to lowercase
-            hostname = parsed.hostname.lower() if parsed.hostname else ''
+            hostname = parsed.hostname.lower() if parsed.hostname else ""
 
             # Handle default ports
             port = parsed.port
             if port:
-                if (scheme == 'http' and port == 80) or (scheme == 'https' and port == 443):
+                if (scheme == "http" and port == 80) or (
+                    scheme == "https" and port == 443
+                ):
                     port = None
-                elif (scheme == 'ftp' and port == 21) or (scheme == 'ftps' and port == 990):
+                elif (scheme == "ftp" and port == 21) or (
+                    scheme == "ftps" and port == 990
+                ):
                     port = None
 
             # Reconstruct netloc
@@ -98,13 +104,13 @@ class URLValidator:
                 netloc += f":{port}"
 
             # Normalize path
-            path = parsed.path or '/'
-            if not path.startswith('/'):
-                path = '/' + path
+            path = parsed.path or "/"
+            if not path.startswith("/"):
+                path = "/" + path
 
             # Remove empty query and fragment
-            query = parsed.query if parsed.query else ''
-            fragment = parsed.fragment if parsed.fragment else ''
+            query = parsed.query if parsed.query else ""
+            fragment = parsed.fragment if parsed.fragment else ""
 
             return urlunparse((scheme, netloc, path, parsed.params, query, fragment))
 
@@ -131,10 +137,10 @@ class URLValidator:
 
             # Extract components
             scheme = parsed.scheme.lower()
-            domain = parsed.hostname.lower() if parsed.hostname else ''
-            path = parsed.path or '/'
+            domain = parsed.hostname.lower() if parsed.hostname else ""
+            path = parsed.path or "/"
             query_params = dict(parse_qs(parsed.query)) if parsed.query else {}
-            fragment = parsed.fragment or ''
+            fragment = parsed.fragment or ""
             port = parsed.port
 
             # Check for issues
@@ -167,8 +173,8 @@ class URLValidator:
                 query_params=flat_params,
                 fragment=fragment,
                 port=port,
-                is_secure=scheme in ('https', 'ftps'),
-                issues=issues
+                is_secure=scheme in ("https", "ftps"),
+                issues=issues,
             )
 
         except Exception as e:
@@ -178,14 +184,14 @@ class URLValidator:
                 original_url=url,
                 normalized_url=normalized_url,
                 is_valid=False,
-                scheme='',
-                domain='',
-                path='',
+                scheme="",
+                domain="",
+                path="",
                 query_params={},
-                fragment='',
+                fragment="",
                 port=None,
                 is_secure=False,
-                issues=issues
+                issues=issues,
             )
 
 

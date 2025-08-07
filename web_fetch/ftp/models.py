@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FTPMode(str, Enum):
@@ -52,70 +52,111 @@ class FTPConfig(BaseModel):
     """Configuration model for FTP operations."""
 
     # Connection settings
-    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds")
-    data_timeout: float = Field(default=300.0, gt=0, description="Data transfer timeout in seconds")
-    keepalive_interval: float = Field(default=30.0, gt=0, description="Keepalive interval in seconds")
+    connection_timeout: float = Field(
+        default=30.0, gt=0, description="Connection timeout in seconds"
+    )
+    data_timeout: float = Field(
+        default=300.0, gt=0, description="Data transfer timeout in seconds"
+    )
+    keepalive_interval: float = Field(
+        default=30.0, gt=0, description="Keepalive interval in seconds"
+    )
 
     # FTP specific settings
     mode: FTPMode = Field(default=FTPMode.PASSIVE, description="FTP connection mode")
-    transfer_mode: FTPTransferMode = Field(default=FTPTransferMode.BINARY, description="Transfer mode")
+    transfer_mode: FTPTransferMode = Field(
+        default=FTPTransferMode.BINARY, description="Transfer mode"
+    )
 
     # Authentication
-    auth_type: FTPAuthType = Field(default=FTPAuthType.ANONYMOUS, description="Authentication type")
-    username: Optional[str] = Field(default=None, description="Username for authentication")
-    password: Optional[str] = Field(default=None, description="Password for authentication")
+    auth_type: FTPAuthType = Field(
+        default=FTPAuthType.ANONYMOUS, description="Authentication type"
+    )
+    username: Optional[str] = Field(
+        default=None, description="Username for authentication"
+    )
+    password: Optional[str] = Field(
+        default=None, description="Password for authentication"
+    )
 
     # Concurrency and performance
-    max_concurrent_downloads: int = Field(default=3, ge=1, le=20, description="Maximum concurrent downloads")
-    max_connections_per_host: int = Field(default=2, ge=1, le=10, description="Max connections per host")
-    enable_parallel_downloads: bool = Field(default=False, description="Enable parallel downloads")
+    max_concurrent_downloads: int = Field(
+        default=3, ge=1, le=20, description="Maximum concurrent downloads"
+    )
+    max_connections_per_host: int = Field(
+        default=2, ge=1, le=10, description="Max connections per host"
+    )
+    enable_parallel_downloads: bool = Field(
+        default=False, description="Enable parallel downloads"
+    )
 
     # Retry settings
-    max_retries: int = Field(default=3, ge=0, le=10, description="Maximum retry attempts")
-    retry_delay: float = Field(default=2.0, ge=0.1, le=60.0, description="Base retry delay in seconds")
-    retry_backoff_factor: float = Field(default=2.0, ge=1.0, le=10.0, description="Exponential backoff factor")
+    max_retries: int = Field(
+        default=3, ge=0, le=10, description="Maximum retry attempts"
+    )
+    retry_delay: float = Field(
+        default=2.0, ge=0.1, le=60.0, description="Base retry delay in seconds"
+    )
+    retry_backoff_factor: float = Field(
+        default=2.0, ge=1.0, le=10.0, description="Exponential backoff factor"
+    )
 
     # File handling
-    chunk_size: int = Field(default=8192, ge=1024, le=1024*1024, description="Chunk size for downloads")
-    buffer_size: int = Field(default=64*1024, ge=8192, description="Buffer size for streaming")
-    max_file_size: Optional[int] = Field(default=None, ge=0, description="Maximum file size in bytes")
+    chunk_size: int = Field(
+        default=8192, ge=1024, le=1024 * 1024, description="Chunk size for downloads"
+    )
+    buffer_size: int = Field(
+        default=64 * 1024, ge=8192, description="Buffer size for streaming"
+    )
+    max_file_size: Optional[int] = Field(
+        default=None, ge=0, description="Maximum file size in bytes"
+    )
 
     # Verification
-    verification_method: FTPVerificationMethod = Field(default=FTPVerificationMethod.SIZE, description="File verification method")
+    verification_method: FTPVerificationMethod = Field(
+        default=FTPVerificationMethod.SIZE, description="File verification method"
+    )
     enable_resume: bool = Field(default=True, description="Enable resumable downloads")
 
     # Rate limiting
-    rate_limit_bytes_per_second: Optional[int] = Field(default=None, ge=1024, description="Rate limit in bytes per second")
-
-    model_config = ConfigDict(
-        use_enum_values=True,
-        validate_assignment=True
+    rate_limit_bytes_per_second: Optional[int] = Field(
+        default=None, ge=1024, description="Rate limit in bytes per second"
     )
+
+    model_config = ConfigDict(use_enum_values=True, validate_assignment=True)
 
 
 class FTPRequest(BaseModel):
     """Model representing a single FTP request."""
 
     url: str = Field(description="FTP URL to process")
-    local_path: Optional[Path] = Field(default=None, description="Local path to save file")
-    operation: str = Field(default="download", pattern=r"^(download|list|info)$", description="FTP operation")
+    local_path: Optional[Path] = Field(
+        default=None, description="Local path to save file"
+    )
+    operation: str = Field(
+        default="download",
+        pattern=r"^(download|list|info)$",
+        description="FTP operation",
+    )
 
     # Override settings
-    config_override: Optional[FTPConfig] = Field(default=None, description="Override configuration")
-    timeout_override: Optional[float] = Field(default=None, gt=0, description="Override timeout")
+    config_override: Optional[FTPConfig] = Field(
+        default=None, description="Override configuration"
+    )
+    timeout_override: Optional[float] = Field(
+        default=None, gt=0, description="Override timeout"
+    )
 
-    @field_validator('url')
+    @field_validator("url")
     @classmethod
     def validate_ftp_url(cls, v: Any) -> Any:
         """Validate FTP URL format and scheme."""
         parsed = urlparse(str(v))
-        if parsed.scheme not in ('ftp', 'ftps'):
-            raise ValueError('URL must use ftp or ftps scheme')
+        if parsed.scheme not in ("ftp", "ftps"):
+            raise ValueError("URL must use ftp or ftps scheme")
         return v
 
-    model_config = ConfigDict(
-        use_enum_values=True
-    )
+    model_config = ConfigDict(use_enum_values=True)
 
 
 @dataclass
@@ -197,17 +238,21 @@ class FTPProgressInfo:
 class FTPBatchRequest(BaseModel):
     """Model for batch FTP operations."""
 
-    requests: List[FTPRequest] = Field(min_length=1, max_length=100, description="List of FTP requests")
+    requests: List[FTPRequest] = Field(
+        min_length=1, max_length=100, description="List of FTP requests"
+    )
     config: Optional[FTPConfig] = Field(default=None, description="Batch configuration")
-    parallel_execution: bool = Field(default=False, description="Execute requests in parallel")
+    parallel_execution: bool = Field(
+        default=False, description="Execute requests in parallel"
+    )
 
-    @field_validator('requests')
+    @field_validator("requests")
     @classmethod
     def validate_unique_urls(cls, v: Any) -> Any:
         """Ensure URLs are unique in batch request."""
         urls = [req.url for req in v]
         if len(urls) != len(set(urls)):
-            raise ValueError('Duplicate URLs found in batch request')
+            raise ValueError("Duplicate URLs found in batch request")
         return v
 
 
@@ -224,7 +269,9 @@ class FTPBatchResult:
     timestamp: datetime
 
     @classmethod
-    def from_results(cls, results: List[FTPResult], total_time: float) -> FTPBatchResult:
+    def from_results(
+        cls, results: List[FTPResult], total_time: float
+    ) -> FTPBatchResult:
         """Create FTPBatchResult from individual results."""
         successful = sum(1 for r in results if r.is_success)
         failed = len(results) - successful
@@ -237,7 +284,7 @@ class FTPBatchResult:
             failed_requests=failed,
             total_bytes_transferred=total_bytes,
             total_time=total_time,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     @property
@@ -256,6 +303,7 @@ class FTPBatchResult:
 
 
 # Connection pool models
+
 
 @dataclass
 class FTPConnectionInfo:
@@ -293,5 +341,5 @@ class FTPVerificationResult:
             "expected": self.expected_value,
             "actual": self.actual_value,
             "valid": self.is_valid,
-            "error": self.error
+            "error": self.error,
         }

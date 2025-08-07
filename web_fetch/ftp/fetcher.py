@@ -228,7 +228,7 @@ class FTPFetcher:
         self,
         url: str,
         local_path: Path,
-        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None,
     ) -> FTPResult:
         """
         Download a single file from FTP server.
@@ -241,13 +241,15 @@ class FTPFetcher:
         Returns:
             FTPResult with download information
         """
-        return await self.file_operations.download_file(url, local_path, progress_callback)
+        return await self.file_operations.download_file(
+            url, local_path, progress_callback
+        )
 
     async def stream_download(
         self,
         url: str,
         local_path: Path,
-        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None,
     ) -> FTPResult:
         """
         Download a file using streaming for large files.
@@ -269,7 +271,7 @@ class FTPFetcher:
     async def download_batch(
         self,
         batch_request: FTPBatchRequest,
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> FTPBatchResult:
         """
         Download multiple files in batch.
@@ -281,7 +283,9 @@ class FTPFetcher:
         Returns:
             FTPBatchResult with results from all downloads
         """
-        return await self.parallel_downloader.download_batch(batch_request, progress_callback)
+        return await self.parallel_downloader.download_batch(
+            batch_request, progress_callback
+        )
 
     async def fetch_single(self, request: FTPRequest) -> FTPResult:
         """
@@ -296,10 +300,16 @@ class FTPFetcher:
         if request.operation == "download":
             if request.local_path is None:
                 from ..exceptions import FTPError
-                raise FTPError("Local path required for download operation", request.url)
+
+                raise FTPError(
+                    "Local path required for download operation", request.url
+                )
 
             # Choose appropriate download method based on configuration
-            if self.config.max_file_size and self.config.max_file_size > 10 * 1024 * 1024:
+            if (
+                self.config.max_file_size
+                and self.config.max_file_size > 10 * 1024 * 1024
+            ):
                 return await self.stream_download(request.url, request.local_path)
             else:
                 return await self.download_file(request.url, request.local_path)
@@ -315,7 +325,7 @@ class FTPFetcher:
                 total_bytes=None,
                 response_time=0.0,
                 timestamp=datetime.now(),
-                files_list=files_list
+                files_list=files_list,
             )
 
         elif request.operation == "info":
@@ -329,11 +339,12 @@ class FTPFetcher:
                 total_bytes=None,
                 response_time=0.0,
                 timestamp=datetime.now(),
-                file_info=file_info
+                file_info=file_info,
             )
 
         else:
             from .exceptions import FTPError
+
             raise FTPError(f"Unsupported operation: {request.operation}", request.url)
 
     # Verification methods
@@ -342,7 +353,7 @@ class FTPFetcher:
         self,
         local_path: Path,
         file_info: FTPFileInfo,
-        expected_checksums: Optional[Dict[str, str]] = None
+        expected_checksums: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
         Verify a downloaded file.
@@ -385,11 +396,12 @@ class FTPFetcher:
 
 # Convenience functions
 
+
 async def ftp_download_file(
     url: str,
     local_path: Path,
     config: Optional[FTPConfig] = None,
-    progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None
+    progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None,
 ) -> FTPResult:
     """
     Convenience function to download a single FTP file.
@@ -408,8 +420,7 @@ async def ftp_download_file(
 
 
 async def ftp_list_directory(
-    url: str,
-    config: Optional[FTPConfig] = None
+    url: str, config: Optional[FTPConfig] = None
 ) -> List[FTPFileInfo]:
     """
     Convenience function to list FTP directory contents.
@@ -426,8 +437,7 @@ async def ftp_list_directory(
 
 
 async def ftp_get_file_info(
-    url: str,
-    config: Optional[FTPConfig] = None
+    url: str, config: Optional[FTPConfig] = None
 ) -> FTPFileInfo:
     """
     Convenience function to get FTP file information.
@@ -447,7 +457,7 @@ async def ftp_download_batch(
     requests: List[FTPRequest],
     config: Optional[FTPConfig] = None,
     parallel: bool = False,
-    progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+    progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
 ) -> FTPBatchResult:
     """
     Convenience function to download multiple FTP files.
@@ -462,9 +472,7 @@ async def ftp_download_batch(
         FTPBatchResult with results from all downloads
     """
     batch_request = FTPBatchRequest(
-        requests=requests,
-        config=config,
-        parallel_execution=parallel
+        requests=requests, config=config, parallel_execution=parallel
     )
 
     async with FTPFetcher(config) as fetcher:

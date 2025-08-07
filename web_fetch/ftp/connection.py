@@ -91,7 +91,7 @@ class FTPConnectionPool:
             aioftp.Client: FTP client connection
         """
         parsed = urlparse(url)
-        host = parsed.hostname or 'localhost'
+        host = parsed.hostname or "localhost"
         port = parsed.port or 21
         username = parsed.username
         password = parsed.password
@@ -105,7 +105,10 @@ class FTPConnectionPool:
 
         async with self._lock:
             # Try to get existing connection
-            if connection_key in self._connections and self._connections[connection_key]:
+            if (
+                connection_key in self._connections
+                and self._connections[connection_key]
+            ):
                 client = self._connections[connection_key].pop()
                 self._connection_info[connection_key].last_used = datetime.now()
                 self._connection_info[connection_key].connection_count += 1
@@ -119,10 +122,10 @@ class FTPConnectionPool:
                         host=host,
                         port=port,
                         username=username,
-                        is_secure=parsed.scheme == 'ftps',
+                        is_secure=parsed.scheme == "ftps",
                         created_at=datetime.now(),
                         last_used=datetime.now(),
-                        connection_count=1
+                        connection_count=1,
                     )
                 else:
                     self._connection_info[connection_key].last_used = datetime.now()
@@ -137,7 +140,10 @@ class FTPConnectionPool:
                     self._connections[connection_key] = []
 
                 # Only keep up to max_connections_per_host connections
-                if len(self._connections[connection_key]) < self.config.max_connections_per_host:
+                if (
+                    len(self._connections[connection_key])
+                    < self.config.max_connections_per_host
+                ):
                     self._connections[connection_key].append(client)
                 else:
                     try:
@@ -146,11 +152,7 @@ class FTPConnectionPool:
                         pass
 
     async def _create_connection(
-        self,
-        host: str,
-        port: int,
-        username: Optional[str],
-        password: Optional[str]
+        self, host: str, port: int, username: Optional[str], password: Optional[str]
     ) -> aioftp.Client:
         """
         Create a new FTP connection.
@@ -216,7 +218,9 @@ class FTPConnectionPool:
         """Get statistics about the connection pool."""
         return {
             "total_connection_keys": len(self._connection_info),
-            "active_connections": sum(len(conns) for conns in self._connections.values()),
+            "active_connections": sum(
+                len(conns) for conns in self._connections.values()
+            ),
             "connection_info": {
                 key: {
                     "host": info.host,
@@ -225,8 +229,8 @@ class FTPConnectionPool:
                     "is_secure": info.is_secure,
                     "created_at": info.created_at.isoformat(),
                     "last_used": info.last_used.isoformat(),
-                    "connection_count": info.connection_count
+                    "connection_count": info.connection_count,
                 }
                 for key, info in self._connection_info.items()
-            }
+            },
         }

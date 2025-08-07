@@ -19,7 +19,12 @@ from urllib.parse import urlparse
 import aiofiles
 import aioftp
 
-from ..exceptions import ErrorHandler, FTPError, FTPFileNotFoundError, FTPVerificationError
+from ..exceptions import (
+    ErrorHandler,
+    FTPError,
+    FTPFileNotFoundError,
+    FTPVerificationError,
+)
 from .connection import FTPConnectionPool
 from .models import (
     FTPConfig,
@@ -61,10 +66,10 @@ class FTPFileOperations:
         try:
             async with self.connection_pool.get_connection(url) as client:
                 parsed = urlparse(url)
-                path = parsed.path or '/'
+                path = parsed.path or "/"
 
                 # Change to the directory
-                if path != '/':
+                if path != "/":
                     await client.change_directory(path)
 
                 # List directory contents
@@ -73,10 +78,22 @@ class FTPFileOperations:
                     file_info = FTPFileInfo(
                         name=path_info.name,
                         path=str(path_info),
-                        size=path_info.stat.size if hasattr(path_info.stat, 'size') else None,
-                        modified_time=datetime.fromtimestamp(path_info.stat.st_mtime) if hasattr(path_info.stat, 'st_mtime') else None,
+                        size=(
+                            path_info.stat.size
+                            if hasattr(path_info.stat, "size")
+                            else None
+                        ),
+                        modified_time=(
+                            datetime.fromtimestamp(path_info.stat.st_mtime)
+                            if hasattr(path_info.stat, "st_mtime")
+                            else None
+                        ),
                         is_directory=path_info.is_dir(),
-                        permissions=oct(path_info.stat.st_mode) if hasattr(path_info.stat, 'st_mode') else None,
+                        permissions=(
+                            oct(path_info.stat.st_mode)
+                            if hasattr(path_info.stat, "st_mode")
+                            else None
+                        ),
                     )
                     files.append(file_info)
 
@@ -98,7 +115,7 @@ class FTPFileOperations:
         try:
             async with self.connection_pool.get_connection(url) as client:
                 parsed = urlparse(url)
-                path = parsed.path or '/'
+                path = parsed.path or "/"
 
                 # Get file/directory info
                 try:
@@ -107,10 +124,22 @@ class FTPFileOperations:
                     file_info = FTPFileInfo(
                         name=os.path.basename(path),
                         path=path,
-                        size=stat_info.size if hasattr(stat_info, 'size') else None,
-                        modified_time=datetime.fromtimestamp(stat_info.st_mtime) if hasattr(stat_info, 'st_mtime') else None,
-                        is_directory=stat_info.is_dir() if hasattr(stat_info, 'is_dir') else False,
-                        permissions=oct(stat_info.st_mode) if hasattr(stat_info, 'st_mode') else None,
+                        size=stat_info.size if hasattr(stat_info, "size") else None,
+                        modified_time=(
+                            datetime.fromtimestamp(stat_info.st_mtime)
+                            if hasattr(stat_info, "st_mtime")
+                            else None
+                        ),
+                        is_directory=(
+                            stat_info.is_dir()
+                            if hasattr(stat_info, "is_dir")
+                            else False
+                        ),
+                        permissions=(
+                            oct(stat_info.st_mode)
+                            if hasattr(stat_info, "st_mode")
+                            else None
+                        ),
                     )
 
                     return file_info
@@ -127,10 +156,22 @@ class FTPFileOperations:
                                 return FTPFileInfo(
                                     name=path_info.name,
                                     path=path,
-                                    size=path_info.stat.size if hasattr(path_info.stat, 'size') else None,
-                                    modified_time=datetime.fromtimestamp(path_info.stat.st_mtime) if hasattr(path_info.stat, 'st_mtime') else None,
+                                    size=(
+                                        path_info.stat.size
+                                        if hasattr(path_info.stat, "size")
+                                        else None
+                                    ),
+                                    modified_time=(
+                                        datetime.fromtimestamp(path_info.stat.st_mtime)
+                                        if hasattr(path_info.stat, "st_mtime")
+                                        else None
+                                    ),
                                     is_directory=path_info.is_dir(),
-                                    permissions=oct(path_info.stat.st_mode) if hasattr(path_info.stat, 'st_mode') else None,
+                                    permissions=(
+                                        oct(path_info.stat.st_mode)
+                                        if hasattr(path_info.stat, "st_mode")
+                                        else None
+                                    ),
                                 )
 
                     raise FTPFileNotFoundError(f"File not found: {path}", url)
@@ -141,10 +182,7 @@ class FTPFileOperations:
             raise ErrorHandler.handle_ftp_error(e, url, "get_file_info")
 
     async def download_file(
-        self,
-        url: str,
-        local_path: Path,
-        progress_callback: Optional[Callable] = None
+        self, url: str, local_path: Path, progress_callback: Optional[Callable] = None
     ) -> FTPResult:
         """
         Download a file from FTP server.
@@ -185,7 +223,7 @@ class FTPFileOperations:
                         total_bytes=total_bytes,
                         response_time=time.time() - start_time,
                         timestamp=datetime.now(),
-                        file_info=file_info
+                        file_info=file_info,
                     )
 
             async with self.connection_pool.get_connection(url) as client:
@@ -214,21 +252,32 @@ class FTPFileOperations:
                             bytes_transferred += len(chunk)
 
                             # Progress callback
-                            if progress_callback and time.time() - last_progress_time >= 0.1:
+                            if (
+                                progress_callback
+                                and time.time() - last_progress_time >= 0.1
+                            ):
                                 progress_info = FTPProgressInfo(
-                                    bytes_transferred=bytes_transferred + resume_position,
+                                    bytes_transferred=bytes_transferred
+                                    + resume_position,
                                     total_bytes=total_bytes,
-                                    transfer_rate=bytes_transferred / (time.time() - start_time) if time.time() > start_time else 0,
+                                    transfer_rate=(
+                                        bytes_transferred / (time.time() - start_time)
+                                        if time.time() > start_time
+                                        else 0
+                                    ),
                                     elapsed_time=time.time() - start_time,
                                     estimated_time_remaining=None,
-                                    current_file=str(local_path)
+                                    current_file=str(local_path),
                                 )
                                 await progress_callback(progress_info)
                                 last_progress_time = time.time()
 
                             # Rate limiting
                             if self.config.rate_limit_bytes_per_second:
-                                expected_time = bytes_transferred / self.config.rate_limit_bytes_per_second
+                                expected_time = (
+                                    bytes_transferred
+                                    / self.config.rate_limit_bytes_per_second
+                                )
                                 actual_time = time.time() - start_time
                                 if actual_time < expected_time:
                                     await asyncio.sleep(expected_time - actual_time)
@@ -243,7 +292,7 @@ class FTPFileOperations:
                         url,
                         verification_method=verification_result.method,
                         expected_value=verification_result.expected_value,
-                        actual_value=verification_result.actual_value
+                        actual_value=verification_result.actual_value,
                     )
 
             return FTPResult(
@@ -256,7 +305,11 @@ class FTPFileOperations:
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
                 file_info=file_info,
-                verification_result=verification_result.verification_details if verification_result else None
+                verification_result=(
+                    verification_result.verification_details
+                    if verification_result
+                    else None
+                ),
             )
 
         except Exception as e:
@@ -273,10 +326,12 @@ class FTPFileOperations:
                 total_bytes=total_bytes,
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
-                error=error
+                error=error,
             )
 
-    async def _verify_file(self, local_path: Path, file_info: FTPFileInfo) -> FTPVerificationResult:
+    async def _verify_file(
+        self, local_path: Path, file_info: FTPFileInfo
+    ) -> FTPVerificationResult:
         """
         Verify downloaded file integrity.
 
@@ -298,7 +353,7 @@ class FTPFileOperations:
                         expected_value=None,
                         actual_value=str(actual_size),
                         is_valid=True,
-                        error="No expected size available, skipping verification"
+                        error="No expected size available, skipping verification",
                     )
 
                 is_valid = actual_size == expected_size
@@ -307,14 +362,25 @@ class FTPFileOperations:
                     expected_value=str(expected_size),
                     actual_value=str(actual_size),
                     is_valid=is_valid,
-                    error=None if is_valid else f"Size mismatch: expected {expected_size}, got {actual_size}"
+                    error=(
+                        None
+                        if is_valid
+                        else f"Size mismatch: expected {expected_size}, got {actual_size}"
+                    ),
                 )
 
-            elif self.config.verification_method in [FTPVerificationMethod.MD5, FTPVerificationMethod.SHA256]:
+            elif self.config.verification_method in [
+                FTPVerificationMethod.MD5,
+                FTPVerificationMethod.SHA256,
+            ]:
                 # Calculate file hash
-                hash_func = hashlib.md5() if self.config.verification_method == FTPVerificationMethod.MD5 else hashlib.sha256()
+                hash_func = (
+                    hashlib.md5()
+                    if self.config.verification_method == FTPVerificationMethod.MD5
+                    else hashlib.sha256()
+                )
 
-                async with aiofiles.open(local_path, 'rb') as f:
+                async with aiofiles.open(local_path, "rb") as f:
                     while chunk := await f.read(self.config.chunk_size):
                         hash_func.update(chunk)
 
@@ -327,7 +393,7 @@ class FTPFileOperations:
                     expected_value=None,
                     actual_value=actual_hash,
                     is_valid=True,
-                    error="Hash calculated but no expected value to compare against"
+                    error="Hash calculated but no expected value to compare against",
                 )
 
             else:
@@ -336,7 +402,7 @@ class FTPFileOperations:
                     expected_value=None,
                     actual_value=None,
                     is_valid=True,
-                    error=None
+                    error=None,
                 )
 
         except Exception as e:
@@ -345,5 +411,5 @@ class FTPFileOperations:
                 expected_value=None,
                 actual_value=None,
                 is_valid=False,
-                error=f"Verification failed: {str(e)}"
+                error=f"Verification failed: {str(e)}",
             )

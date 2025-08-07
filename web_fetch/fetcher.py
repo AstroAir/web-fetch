@@ -10,31 +10,33 @@ the modular components in the src/ directory for backward compatibility.
 
 from __future__ import annotations
 
-# Import all components from the modular structure
-from .src.core_fetcher import WebFetcher
-from .src.streaming_fetcher import StreamingWebFetcher
-from .src.convenience import (
-    fetch_url,
-    fetch_urls,
-    download_file,
-    fetch_with_cache,
-)
-from .src.url_utils import (
-    is_valid_url,
-    normalize_url,
-    analyze_url,
-    analyze_headers,
-    detect_content_type,
-)
+from typing import Any, Dict, List, Optional, Union
+
+from .models.base import ContentType
 
 # Enhanced convenience functions
 from .models.http import FetchConfig, FetchRequest, FetchResult
-from .models.base import ContentType
-from .utils.circuit_breaker import CircuitBreakerConfig
-from .utils.transformers import TransformationPipeline
+from .src.convenience import (
+    download_file,
+    fetch_url,
+    fetch_urls,
+    fetch_with_cache,
+)
+
+# Import all components from the modular structure
+from .src.core_fetcher import WebFetcher
+from .src.streaming_fetcher import StreamingWebFetcher
+from .src.url_utils import (
+    analyze_headers,
+    analyze_url,
+    detect_content_type,
+    is_valid_url,
+    normalize_url,
+)
 from .utils.cache import EnhancedCacheConfig
+from .utils.circuit_breaker import CircuitBreakerConfig
 from .utils.js_renderer import JSRenderConfig
-from typing import List, Optional, Dict, Any, Union
+from .utils.transformers import TransformationPipeline
 
 
 async def enhanced_fetch_url(
@@ -50,7 +52,7 @@ async def enhanced_fetch_url(
     enable_metrics: bool = True,
     transformation_pipeline: Optional[TransformationPipeline] = None,
     cache_config: Optional[EnhancedCacheConfig] = None,
-    js_config: Optional[JSRenderConfig] = None
+    js_config: Optional[JSRenderConfig] = None,
 ) -> FetchResult:
     """
     Enhanced convenience function for single URL fetching with all advanced features.
@@ -79,7 +81,7 @@ async def enhanced_fetch_url(
         headers=headers,
         data=data,
         params=params,
-        content_type=content_type
+        content_type=content_type,
     )
 
     async with WebFetcher(
@@ -89,7 +91,7 @@ async def enhanced_fetch_url(
         enable_metrics=enable_metrics,
         transformation_pipeline=transformation_pipeline,
         cache_config=cache_config,
-        js_config=js_config
+        js_config=js_config,
     ) as fetcher:
         return await fetcher.fetch_single(request)
 
@@ -105,7 +107,7 @@ async def enhanced_fetch_urls(
     enable_metrics: bool = True,
     transformation_pipeline: Optional[TransformationPipeline] = None,
     cache_config: Optional[EnhancedCacheConfig] = None,
-    js_config: Optional[JSRenderConfig] = None
+    js_config: Optional[JSRenderConfig] = None,
 ) -> List[FetchResult]:
     """
     Enhanced convenience function for batch URL fetching with all advanced features.
@@ -129,12 +131,7 @@ async def enhanced_fetch_urls(
     from .models.http import BatchFetchRequest
 
     requests = [
-        FetchRequest(
-            url=url,
-            method=method,
-            headers=headers,
-            content_type=content_type
-        )
+        FetchRequest(url=url, method=method, headers=headers, content_type=content_type)
         for url in urls
     ]
 
@@ -147,7 +144,7 @@ async def enhanced_fetch_urls(
         enable_metrics=enable_metrics,
         transformation_pipeline=transformation_pipeline,
         cache_config=cache_config,
-        js_config=js_config
+        js_config=js_config,
     ) as fetcher:
         batch_result = await fetcher.fetch_batch(batch_request)
         return batch_result.results
@@ -158,17 +155,14 @@ __all__ = [
     # Core classes
     "WebFetcher",
     "StreamingWebFetcher",
-
     # Convenience functions
     "fetch_url",
     "fetch_urls",
     "download_file",
     "fetch_with_cache",
-
     # Enhanced convenience functions
     "enhanced_fetch_url",
     "enhanced_fetch_urls",
-
     # URL utilities
     "is_valid_url",
     "normalize_url",

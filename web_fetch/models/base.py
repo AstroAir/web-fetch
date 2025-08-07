@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ContentType(str, Enum):
@@ -25,16 +25,16 @@ class ContentType(str, Enum):
     Each type determines the parsing strategy and return type.
     """
 
-    RAW = "raw"          # Returns bytes unchanged
-    JSON = "json"        # Parses as JSON, returns dict/list/primitive
-    HTML = "html"        # Parses with BeautifulSoup, returns parsed object
-    TEXT = "text"        # Decodes as text, returns string
-    PDF = "pdf"          # Extracts text and metadata from PDF documents
-    IMAGE = "image"      # Extracts metadata and descriptions from images
-    RSS = "rss"          # Parses RSS/Atom feeds, returns feed items and metadata
-    CSV = "csv"          # Parses CSV data into structured format
+    RAW = "raw"  # Returns bytes unchanged
+    JSON = "json"  # Parses as JSON, returns dict/list/primitive
+    HTML = "html"  # Parses with BeautifulSoup, returns parsed object
+    TEXT = "text"  # Decodes as text, returns string
+    PDF = "pdf"  # Extracts text and metadata from PDF documents
+    IMAGE = "image"  # Extracts metadata and descriptions from images
+    RSS = "rss"  # Parses RSS/Atom feeds, returns feed items and metadata
+    CSV = "csv"  # Parses CSV data into structured format
     MARKDOWN = "markdown"  # Converts HTML to Markdown format
-    XML = "xml"          # Parses XML documents with structure preservation
+    XML = "xml"  # Parses XML documents with structure preservation
 
 
 class RetryStrategy(str, Enum):
@@ -44,8 +44,8 @@ class RetryStrategy(str, Enum):
     Defines how retry delays are calculated when requests fail.
     """
 
-    NONE = "none"              # No retries, fail immediately
-    LINEAR = "linear"          # Linear backoff: delay * (attempt + 1)
+    NONE = "none"  # No retries, fail immediately
+    LINEAR = "linear"  # Linear backoff: delay * (attempt + 1)
     EXPONENTIAL = "exponential"  # Exponential backoff: delay * (2 ** attempt)
 
 
@@ -75,7 +75,7 @@ class RequestHeaders:
     accept_encoding: str = "gzip, deflate, br"
     connection: str = "keep-alive"
     custom_headers: Dict[str, str] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, str]:
         """Convert headers to dictionary format."""
         headers = {
@@ -121,19 +121,19 @@ class ProgressInfo:
 
 # Common configuration base classes
 
+
 class BaseConfig(BaseModel):
     """Base configuration class with common validation settings."""
-    
+
     model_config = ConfigDict(
-        use_enum_values=True,
-        validate_assignment=True,
-        extra='forbid'
+        use_enum_values=True, validate_assignment=True, extra="forbid"
     )
 
 
 # Common result base classes
 
 # Resource-specific metadata classes
+
 
 @dataclass
 class PDFMetadata:

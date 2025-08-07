@@ -8,10 +8,9 @@ and analysis, as well as response header analysis and content type detection.
 from __future__ import annotations
 
 from typing import Dict, Optional
-
-from ..models.http import URLAnalysis
-from ..models.http import HeaderAnalysis
 from urllib.parse import urljoin
+
+from ..models.http import HeaderAnalysis, URLAnalysis
 
 
 def is_valid_url(url: str) -> bool:
@@ -25,6 +24,7 @@ def is_valid_url(url: str) -> bool:
         True if URL is valid, False otherwise
     """
     from .validation import URLValidator
+
     return URLValidator.is_valid_url(url)
 
 
@@ -40,6 +40,7 @@ def normalize_url(url: str, base_url: Optional[str] = None) -> str:
         Normalized URL string
     """
     from .validation import URLValidator
+
     # Resolve relative URL against base_url if provided
     if base_url:
         url = urljoin(base_url, url)
@@ -57,10 +58,13 @@ def analyze_url(url: str) -> URLAnalysis:  # Returns URLAnalysis
         URLAnalysis object with detailed information
     """
     from .validation import URLValidator
+
     return URLValidator.analyze_url(url)
 
 
-def analyze_headers(headers: Dict[str, str]) -> HeaderAnalysis:  # Returns HeaderAnalysis
+def analyze_headers(
+    headers: Dict[str, str],
+) -> HeaderAnalysis:  # Returns HeaderAnalysis
     """
     Analyze HTTP response headers.
 
@@ -71,6 +75,7 @@ def analyze_headers(headers: Dict[str, str]) -> HeaderAnalysis:  # Returns Heade
         HeaderAnalysis object with parsed header information
     """
     from .response import ResponseAnalyzer
+
     return ResponseAnalyzer.analyze_headers(headers)
 
 
@@ -86,4 +91,5 @@ def detect_content_type(headers: Dict[str, str], content: bytes) -> str:
         Detected content type string
     """
     from .response import ResponseAnalyzer
+
     return ResponseAnalyzer.detect_content_type(headers, content)

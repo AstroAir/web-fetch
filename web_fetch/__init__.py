@@ -13,6 +13,72 @@ Features:
 - Multiple content parsing options (JSON, HTML, text, raw)
 """
 
+# Authentication support
+from .auth import (
+    APIKeyAuth,
+    APIKeyConfig,
+    AuthConfig,
+    AuthManager,
+    AuthMethod,
+    AuthResult,
+    BasicAuth,
+    BasicAuthConfig,
+    BearerTokenAuth,
+    BearerTokenConfig,
+    CustomAuth,
+    CustomAuthConfig,
+    JWTAuth,
+    JWTConfig,
+    OAuth2Auth,
+    OAuth2Config,
+    OAuthTokenResponse,
+)
+
+# Enhanced batch operations
+from .batch import (
+    BatchConfig,
+    BatchManager,
+    BatchMetrics,
+    BatchPriority,
+    BatchProcessor,
+    BatchRequest,
+    BatchResult,
+    BatchScheduler,
+    BatchStatus,
+    PriorityQueue,
+)
+
+# Configuration management
+from .config import (
+    ConfigLoader,
+    ConfigManager,
+    ConfigValidator,
+    EnvironmentConfig,
+    FeatureFlags,
+    GlobalConfig,
+    LoggingConfig,
+    PerformanceConfig,
+    SecurityConfig,
+    config_manager,
+)
+
+# Crawler APIs functionality
+from .crawlers import (
+    CrawlerCapability,
+    CrawlerConfig,
+    CrawlerManager,
+    CrawlerRequest,
+    CrawlerType,
+    configure_crawler,
+    crawler_crawl_website,
+    crawler_extract_content,
+    crawler_fetch_url,
+    crawler_fetch_urls,
+    crawler_search_web,
+    get_crawler_status,
+    set_fallback_order,
+    set_primary_crawler,
+)
 from .exceptions import (
     AuthenticationError,
     ConnectionError,
@@ -34,6 +100,8 @@ from .exceptions import (
     TimeoutError,
     WebFetchError,
 )
+
+# Enhanced functionality (now integrated into main fetcher)
 from .fetcher import (
     StreamingWebFetcher,
     WebFetcher,
@@ -41,36 +109,13 @@ from .fetcher import (
     analyze_url,
     detect_content_type,
     download_file,
+    enhanced_fetch_url,
+    enhanced_fetch_urls,
     fetch_url,
     fetch_urls,
     fetch_with_cache,
     is_valid_url,
     normalize_url,
-)
-from .models import (
-    BatchFetchRequest,
-    BatchFetchResult,
-    CacheConfig,
-    ContentType,
-    FetchConfig,
-    FetchRequest,
-    FetchResult,
-    ProgressInfo,
-    RateLimitConfig,
-    RequestHeaders,
-    RetryStrategy,
-    SessionConfig,
-    StreamingConfig,
-    StreamRequest,
-    StreamResult,
-    # Resource metadata classes
-    PDFMetadata,
-    ImageMetadata,
-    FeedMetadata,
-    FeedItem,
-    CSVMetadata,
-    LinkInfo,
-    ContentSummary,
 )
 from .ftp import (
     FTPAuthType,
@@ -78,6 +123,7 @@ from .ftp import (
     FTPBatchResult,
     FTPConfig,
     FTPConnectionInfo,
+    FTPFetcher,
     FTPFileInfo,
     FTPMode,
     FTPProgressInfo,
@@ -86,125 +132,83 @@ from .ftp import (
     FTPTransferMode,
     FTPVerificationMethod,
     FTPVerificationResult,
-)
-from .utils import (
-    RateLimiter, ResponseAnalyzer, SimpleCache, URLValidator,
-    # Enhanced utilities
-    CircuitBreaker, CircuitBreakerConfig, with_circuit_breaker,
-    RequestDeduplicator, deduplicate_request,
-    TransformationPipeline, JSONPathExtractor, HTMLExtractor, RegexExtractor,
-    MetricsCollector, record_request_metrics, get_metrics_summary
-)
-from .ftp import (
-    FTPFetcher,
     ftp_download_batch,
     ftp_download_file,
     ftp_get_file_info,
     ftp_list_directory,
 )
 
-# Authentication support
-from .auth import (
-    AuthMethod,
-    AuthConfig,
-    AuthResult,
-    APIKeyAuth,
-    APIKeyConfig,
-    OAuth2Auth,
-    OAuth2Config,
-    OAuthTokenResponse,
-    JWTAuth,
-    JWTConfig,
-    BasicAuth,
-    BasicAuthConfig,
-    BearerTokenAuth,
-    BearerTokenConfig,
-    CustomAuth,
-    CustomAuthConfig,
-    AuthManager,
-)
-
-# Configuration management
-from .config import (
-    ConfigManager,
-    config_manager,
-    GlobalConfig,
-    LoggingConfig,
-    SecurityConfig,
-    PerformanceConfig,
-    FeatureFlags,
-    EnvironmentConfig,
-    ConfigLoader,
-    ConfigValidator,
+# Enhanced HTTP support
+from .http import (
+    CookieJar,
+    CookieManager,
+    DownloadHandler,
+    FileUploadHandler,
+    HeaderManager,
+    HeaderPresets,
+    HTTPMethod,
+    HTTPMethodHandler,
+    MultipartUploadHandler,
+    PaginationHandler,
+    PaginationStrategy,
+    ResumableDownloadHandler,
 )
 
 # Enhanced logging
 from .logging import (
-    LoggingManager,
-    setup_logging,
-    StructuredFormatter,
+    AsyncFileHandler,
     ColoredFormatter,
     CompactFormatter,
-    AsyncFileHandler,
-    RotatingAsyncFileHandler,
-    MetricsHandler,
-    SensitiveDataFilter,
-    RateLimitFilter,
     ComponentFilter,
+    LoggingManager,
+    MetricsHandler,
+    RateLimitFilter,
+    RotatingAsyncFileHandler,
+    SensitiveDataFilter,
+    StructuredFormatter,
+    setup_logging,
 )
-
-# Enhanced batch operations
-from .batch import (
-    BatchManager,
-    BatchRequest,
-    BatchResult,
-    BatchConfig,
-    BatchPriority,
-    BatchStatus,
-    BatchMetrics,
-    BatchScheduler,
-    BatchProcessor,
-    PriorityQueue,
+from .models import (  # Resource metadata classes
+    BatchFetchRequest,
+    BatchFetchResult,
+    CacheConfig,
+    ContentSummary,
+    ContentType,
+    CSVMetadata,
+    FeedItem,
+    FeedMetadata,
+    FetchConfig,
+    FetchRequest,
+    FetchResult,
+    ImageMetadata,
+    LinkInfo,
+    PDFMetadata,
+    ProgressInfo,
+    RateLimitConfig,
+    RequestHeaders,
+    RetryStrategy,
+    SessionConfig,
+    StreamingConfig,
+    StreamRequest,
+    StreamResult,
 )
-
-# Enhanced HTTP support
-from .http import (
-    HTTPMethodHandler,
-    HTTPMethod,
-    FileUploadHandler,
-    MultipartUploadHandler,
-    DownloadHandler,
-    ResumableDownloadHandler,
-    PaginationHandler,
-    PaginationStrategy,
-    HeaderManager,
-    HeaderPresets,
-    CookieManager,
-    CookieJar,
-)
-
-# Enhanced functionality (now integrated into main fetcher)
-from .fetcher import (
-    enhanced_fetch_url,
-    enhanced_fetch_urls,
-)
-
-# Crawler APIs functionality
-from .crawlers import (
-    CrawlerType,
-    CrawlerCapability,
-    CrawlerConfig,
-    CrawlerRequest,
-    CrawlerManager,
-    crawler_fetch_url,
-    crawler_fetch_urls,
-    crawler_search_web,
-    crawler_crawl_website,
-    crawler_extract_content,
-    get_crawler_status,
-    configure_crawler,
-    set_primary_crawler,
-    set_fallback_order,
+from .utils import (  # Enhanced utilities
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    HTMLExtractor,
+    JSONPathExtractor,
+    MetricsCollector,
+    RateLimiter,
+    RegexExtractor,
+    RequestDeduplicator,
+    ResponseAnalyzer,
+    SimpleCache,
+    TransformationPipeline,
+    URLValidator,
+    deduplicate_request,
+    get_metrics_summary,
+    record_request_metrics,
+    with_circuit_breaker,
 )
 
 __version__ = "0.1.0"
@@ -216,7 +220,6 @@ __all__ = [
     "WebFetcher",
     "StreamingWebFetcher",
     "FTPFetcher",
-
     # Convenience functions
     "fetch_url",
     "fetch_urls",
@@ -228,29 +231,24 @@ __all__ = [
     "ftp_download_batch",
     "ftp_list_directory",
     "ftp_get_file_info",
-
     # Crawler API functions
     "crawler_fetch_url",
     "crawler_fetch_urls",
     "crawler_search_web",
     "crawler_crawl_website",
     "crawler_extract_content",
-
     # URL utilities
     "is_valid_url",
     "normalize_url",
     "analyze_url",
-
     # Response utilities
     "analyze_headers",
     "detect_content_type",
-
     # Utility classes
     "URLValidator",
     "ResponseAnalyzer",
     "SimpleCache",
     "RateLimiter",
-
     # Crawler management
     "CrawlerType",
     "CrawlerCapability",
@@ -261,7 +259,6 @@ __all__ = [
     "configure_crawler",
     "set_primary_crawler",
     "set_fallback_order",
-
     # Enhanced utilities
     "CircuitBreaker",
     "CircuitBreakerConfig",
@@ -275,7 +272,6 @@ __all__ = [
     "MetricsCollector",
     "record_request_metrics",
     "get_metrics_summary",
-
     # Models and configuration
     "FetchConfig",
     "FetchRequest",
@@ -290,7 +286,6 @@ __all__ = [
     "CacheConfig",
     "RateLimitConfig",
     "SessionConfig",
-
     # Authentication
     "AuthMethod",
     "AuthConfig",
@@ -309,7 +304,6 @@ __all__ = [
     "CustomAuth",
     "CustomAuthConfig",
     "AuthManager",
-
     # Configuration management
     "ConfigManager",
     "config_manager",
@@ -321,7 +315,6 @@ __all__ = [
     "EnvironmentConfig",
     "ConfigLoader",
     "ConfigValidator",
-
     # Enhanced logging
     "LoggingManager",
     "setup_logging",
@@ -334,7 +327,6 @@ __all__ = [
     "SensitiveDataFilter",
     "RateLimitFilter",
     "ComponentFilter",
-
     # Enhanced batch operations
     "BatchManager",
     "BatchRequest",
@@ -346,7 +338,6 @@ __all__ = [
     "BatchScheduler",
     "BatchProcessor",
     "PriorityQueue",
-
     # Enhanced HTTP support
     "HTTPMethodHandler",
     "HTTPMethod",
@@ -360,7 +351,6 @@ __all__ = [
     "HeaderPresets",
     "CookieManager",
     "CookieJar",
-
     # Resource metadata classes
     "PDFMetadata",
     "ImageMetadata",
@@ -369,7 +359,6 @@ __all__ = [
     "CSVMetadata",
     "LinkInfo",
     "ContentSummary",
-
     # Enums
     "ContentType",
     "RetryStrategy",
@@ -377,7 +366,6 @@ __all__ = [
     "FTPAuthType",
     "FTPTransferMode",
     "FTPVerificationMethod",
-
     # FTP Models
     "FTPConfig",
     "FTPRequest",
@@ -388,7 +376,6 @@ __all__ = [
     "FTPProgressInfo",
     "FTPConnectionInfo",
     "FTPVerificationResult",
-
     # Exceptions
     "WebFetchError",
     "NetworkError",

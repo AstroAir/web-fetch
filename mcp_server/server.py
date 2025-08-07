@@ -956,7 +956,7 @@ def create_mcp_server() -> FastMCP:
 
             # Choose handler based on resume capability
             if resume:
-                handler: ResumableDownloadHandler = ResumableDownloadHandler(config)
+                handler = ResumableDownloadHandler(config)
                 download_method = handler.download_file_resumable
             else:
                 handler = DownloadHandler(config)

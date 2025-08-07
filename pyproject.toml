@@ -133,6 +133,18 @@ module = [
     "aioftp.*",
     "aioresponses.*",
     "bs4.*",
+    "jsonpath_ng.*",
+    "playwright.*",
+    "chardet.*",
+    "feedparser.*",
+    "nltk.*",
+    "sklearn.*",
+    "pandas.*",
+    "yaml.*",
+    "tavily.*",
+    "firecrawl.*",
+    "aioredis.*",
+    "redis.*",
 ]
 ignore_missing_imports = true
 

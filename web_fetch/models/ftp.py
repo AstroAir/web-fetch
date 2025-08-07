@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FTPMode(str, Enum):
@@ -134,55 +134,55 @@ class FTPConfig(BaseModel):
         default=30.0,
         gt=0,
         description="Maximum time to wait for FTP connection establishment in seconds. "
-                   "Lower values fail faster for unreachable hosts but may cause issues "
-                   "with slow networks or overloaded servers."
+        "Lower values fail faster for unreachable hosts but may cause issues "
+        "with slow networks or overloaded servers.",
     )
     data_timeout: float = Field(
         default=300.0,
         gt=0,
         description="Maximum time to wait for data transfer operations in seconds. "
-                   "Should be set based on expected file sizes and network speed. "
-                   "Large files over slow connections may need higher values."
+        "Should be set based on expected file sizes and network speed. "
+        "Large files over slow connections may need higher values.",
     )
     keepalive_interval: float = Field(
         default=30.0,
         gt=0,
         description="Interval between keepalive messages in seconds to prevent "
-                   "connection timeouts during long transfers. Should be less than "
-                   "server timeout settings."
+        "connection timeouts during long transfers. Should be less than "
+        "server timeout settings.",
     )
 
     # FTP specific settings - Protocol-level configuration
     mode: FTPMode = Field(
         default=FTPMode.PASSIVE,
         description="FTP connection mode. PASSIVE (default) works better with "
-                   "firewalls and NAT, ACTIVE may be required for some servers. "
-                   "PASSIVE is recommended for most use cases."
+        "firewalls and NAT, ACTIVE may be required for some servers. "
+        "PASSIVE is recommended for most use cases.",
     )
     transfer_mode: FTPTransferMode = Field(
         default=FTPTransferMode.BINARY,
         description="Data transfer mode. BINARY (default) preserves file integrity "
-                   "for all file types, ASCII performs line ending conversion for "
-                   "text files but may corrupt binary files."
+        "for all file types, ASCII performs line ending conversion for "
+        "text files but may corrupt binary files.",
     )
 
     # Authentication - Credential and access control settings
     auth_type: FTPAuthType = Field(
         default=FTPAuthType.ANONYMOUS,
         description="Authentication method. ANONYMOUS allows access without credentials, "
-                   "USER_PASS requires username and password. Some servers may restrict "
-                   "anonymous access."
+        "USER_PASS requires username and password. Some servers may restrict "
+        "anonymous access.",
     )
     username: Optional[str] = Field(
         default=None,
         description="Username for authentication when auth_type is USER_PASS. "
-                   "Required for authenticated access, ignored for anonymous access."
+        "Required for authenticated access, ignored for anonymous access.",
     )
     password: Optional[str] = Field(
         default=None,
         description="Password for authentication when auth_type is USER_PASS. "
-                   "Should be kept secure and not logged. Consider using environment "
-                   "variables or secure credential storage."
+        "Should be kept secure and not logged. Consider using environment "
+        "variables or secure credential storage.",
     )
 
     # Concurrency and performance - Optimize transfer speed and resource usage
@@ -191,22 +191,22 @@ class FTPConfig(BaseModel):
         ge=1,
         le=20,
         description="Maximum number of files that can be downloaded concurrently. "
-                   "Higher values improve throughput but increase server load and "
-                   "memory usage. Respect server connection limits."
+        "Higher values improve throughput but increase server load and "
+        "memory usage. Respect server connection limits.",
     )
     max_connections_per_host: int = Field(
         default=2,
         ge=1,
         le=10,
         description="Maximum number of FTP connections to maintain per host. "
-                   "Higher values reduce connection overhead but consume more resources. "
-                   "Many FTP servers limit concurrent connections per client."
+        "Higher values reduce connection overhead but consume more resources. "
+        "Many FTP servers limit concurrent connections per client.",
     )
     enable_parallel_downloads: bool = Field(
         default=False,
         description="Enable parallel downloading of single files using multiple "
-                   "connections. Can significantly improve speed for large files "
-                   "but requires server support and may be restricted by some servers."
+        "connections. Can significantly improve speed for large files "
+        "but requires server support and may be restricted by some servers.",
     )
 
     # Retry settings - Control failure recovery behavior
@@ -215,60 +215,60 @@ class FTPConfig(BaseModel):
         ge=0,
         le=10,
         description="Maximum number of retry attempts for failed operations. "
-                   "Higher values improve reliability but increase latency for "
-                   "permanently failing operations."
+        "Higher values improve reliability but increase latency for "
+        "permanently failing operations.",
     )
     retry_delay: float = Field(
         default=2.0,
         ge=0.1,
         le=60.0,
         description="Base delay in seconds between retry attempts. Actual delay "
-                   "is calculated as: retry_delay * (retry_backoff_factor ^ attempt)."
+        "is calculated as: retry_delay * (retry_backoff_factor ^ attempt).",
     )
     retry_backoff_factor: float = Field(
         default=2.0,
         ge=1.0,
         le=10.0,
         description="Exponential backoff factor for retry delays. Higher values "
-                   "provide more aggressive backoff to avoid overwhelming failing servers."
+        "provide more aggressive backoff to avoid overwhelming failing servers.",
     )
 
     # File handling - Control data transfer and storage behavior
     chunk_size: int = Field(
         default=8192,
         ge=1024,
-        le=1024*1024,
+        le=1024 * 1024,
         description="Size of data chunks for file transfers in bytes. Larger chunks "
-                   "improve performance but increase memory usage. Optimal size depends "
-                   "on network conditions and available memory. Default: 8KB."
+        "improve performance but increase memory usage. Optimal size depends "
+        "on network conditions and available memory. Default: 8KB.",
     )
     buffer_size: int = Field(
-        default=64*1024,
+        default=64 * 1024,
         ge=8192,
         description="Buffer size for streaming operations in bytes. Should be larger "
-                   "than chunk_size for optimal performance. Affects memory usage during "
-                   "transfers. Default: 64KB."
+        "than chunk_size for optimal performance. Affects memory usage during "
+        "transfers. Default: 64KB.",
     )
     max_file_size: Optional[int] = Field(
         default=None,
         ge=0,
         description="Maximum allowed file size in bytes. Files larger than this limit "
-                   "will be rejected to prevent excessive resource usage. None means "
-                   "no limit (use with caution)."
+        "will be rejected to prevent excessive resource usage. None means "
+        "no limit (use with caution).",
     )
 
     # Verification - Ensure file integrity and completeness
     verification_method: FTPVerificationMethod = Field(
         default=FTPVerificationMethod.SIZE,
         description="Method for verifying downloaded files. SIZE checks file size only "
-                   "(fast), MD5/SHA256 compute cryptographic hashes (slower but more reliable), "
-                   "NONE disables verification (fastest but risky)."
+        "(fast), MD5/SHA256 compute cryptographic hashes (slower but more reliable), "
+        "NONE disables verification (fastest but risky).",
     )
     enable_resume: bool = Field(
         default=True,
         description="Enable resumable downloads for interrupted transfers. Allows "
-                   "continuing partial downloads instead of restarting from beginning. "
-                   "Requires server support for REST command."
+        "continuing partial downloads instead of restarting from beginning. "
+        "Requires server support for REST command.",
     )
 
     # Rate limiting - Control bandwidth usage
@@ -276,39 +276,44 @@ class FTPConfig(BaseModel):
         default=None,
         ge=1024,
         description="Maximum transfer rate in bytes per second. Useful for limiting "
-                   "bandwidth usage or complying with server rate limits. None means "
-                   "no rate limiting. Minimum: 1KB/s."
+        "bandwidth usage or complying with server rate limits. None means "
+        "no rate limiting. Minimum: 1KB/s.",
     )
 
-    model_config = ConfigDict(
-        use_enum_values=True,
-        validate_assignment=True
-    )
+    model_config = ConfigDict(use_enum_values=True, validate_assignment=True)
 
 
 class FTPRequest(BaseModel):
     """Model representing a single FTP request."""
 
     url: str = Field(description="FTP URL to process")
-    local_path: Optional[Path] = Field(default=None, description="Local path to save file")
-    operation: str = Field(default="download", pattern=r"^(download|list|info)$", description="FTP operation")
+    local_path: Optional[Path] = Field(
+        default=None, description="Local path to save file"
+    )
+    operation: str = Field(
+        default="download",
+        pattern=r"^(download|list|info)$",
+        description="FTP operation",
+    )
 
     # Override settings
-    config_override: Optional[FTPConfig] = Field(default=None, description="Override configuration")
-    timeout_override: Optional[float] = Field(default=None, gt=0, description="Override timeout")
+    config_override: Optional[FTPConfig] = Field(
+        default=None, description="Override configuration"
+    )
+    timeout_override: Optional[float] = Field(
+        default=None, gt=0, description="Override timeout"
+    )
 
-    @field_validator('url')
+    @field_validator("url")
     @classmethod
     def validate_ftp_url(cls, v: Any) -> Any:
         """Validate FTP URL format and scheme."""
         parsed = urlparse(str(v))
-        if parsed.scheme not in ('ftp', 'ftps'):
-            raise ValueError('URL must use ftp or ftps scheme')
+        if parsed.scheme not in ("ftp", "ftps"):
+            raise ValueError("URL must use ftp or ftps scheme")
         return v
 
-    model_config = ConfigDict(
-        use_enum_values=True
-    )
+    model_config = ConfigDict(use_enum_values=True)
 
 
 @dataclass
@@ -390,17 +395,21 @@ class FTPProgressInfo:
 class FTPBatchRequest(BaseModel):
     """Model for batch FTP operations."""
 
-    requests: List[FTPRequest] = Field(min_length=1, max_length=100, description="List of FTP requests")
+    requests: List[FTPRequest] = Field(
+        min_length=1, max_length=100, description="List of FTP requests"
+    )
     config: Optional[FTPConfig] = Field(default=None, description="Batch configuration")
-    parallel_execution: bool = Field(default=False, description="Execute requests in parallel")
+    parallel_execution: bool = Field(
+        default=False, description="Execute requests in parallel"
+    )
 
-    @field_validator('requests')
+    @field_validator("requests")
     @classmethod
     def validate_unique_urls(cls, v: Any) -> Any:
         """Ensure URLs are unique in batch request."""
         urls = [req.url for req in v]
         if len(urls) != len(set(urls)):
-            raise ValueError('Duplicate URLs found in batch request')
+            raise ValueError("Duplicate URLs found in batch request")
         return v
 
 
@@ -417,7 +426,9 @@ class FTPBatchResult:
     timestamp: datetime
 
     @classmethod
-    def from_results(cls, results: List[FTPResult], total_time: float) -> FTPBatchResult:
+    def from_results(
+        cls, results: List[FTPResult], total_time: float
+    ) -> FTPBatchResult:
         """Create FTPBatchResult from individual results."""
         successful = sum(1 for r in results if r.is_success)
         failed = len(results) - successful
@@ -430,7 +441,7 @@ class FTPBatchResult:
             failed_requests=failed,
             total_bytes_transferred=total_bytes,
             total_time=total_time,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     @property
@@ -449,6 +460,7 @@ class FTPBatchResult:
 
 
 # Connection pool models
+
 
 @dataclass
 class FTPConnectionInfo:
@@ -486,5 +498,5 @@ class FTPVerificationResult:
             "expected": self.expected_value,
             "actual": self.actual_value,
             "valid": self.is_valid,
-            "error": self.error
+            "error": self.error,
         }

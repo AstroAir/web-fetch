@@ -46,7 +46,7 @@ class FTPParallelDownloader:
     async def download_batch(
         self,
         batch_request: FTPBatchRequest,
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> FTPBatchResult:
         """
         Download multiple files in parallel.
@@ -61,9 +61,13 @@ class FTPParallelDownloader:
         start_time = time.time()
 
         if batch_request.parallel_execution and self.config.enable_parallel_downloads:
-            results = await self._download_parallel(batch_request.requests, progress_callback)
+            results = await self._download_parallel(
+                batch_request.requests, progress_callback
+            )
         else:
-            results = await self._download_sequential(batch_request.requests, progress_callback)
+            results = await self._download_sequential(
+                batch_request.requests, progress_callback
+            )
 
         total_time = time.time() - start_time
         return FTPBatchResult.from_results(results, total_time)
@@ -71,7 +75,7 @@ class FTPParallelDownloader:
     async def _download_parallel(
         self,
         requests: List[FTPRequest],
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> List[FTPResult]:
         """
         Download files in parallel with concurrency control.
@@ -107,7 +111,7 @@ class FTPParallelDownloader:
                     total_bytes=None,
                     response_time=0.0,
                     timestamp=datetime.now(),
-                    error=str(result)
+                    error=str(result),
                 )
                 final_results.append(error_result)
             elif isinstance(result, FTPResult):
@@ -118,7 +122,7 @@ class FTPParallelDownloader:
     async def _download_sequential(
         self,
         requests: List[FTPRequest],
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> List[FTPResult]:
         """
         Download files sequentially.
@@ -146,7 +150,7 @@ class FTPParallelDownloader:
                     total_bytes=None,
                     response_time=0.0,
                     timestamp=datetime.now(),
-                    error=str(e)
+                    error=str(e),
                 )
                 results.append(error_result)
 
@@ -155,7 +159,7 @@ class FTPParallelDownloader:
     async def _download_single_with_semaphore(
         self,
         request: FTPRequest,
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> FTPResult:
         """
         Download a single file with semaphore control for concurrency.
@@ -173,7 +177,7 @@ class FTPParallelDownloader:
     async def _download_single(
         self,
         request: FTPRequest,
-        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[str, FTPProgressInfo], None]] = None,
     ) -> FTPResult:
         """
         Download a single file with retry logic.
@@ -191,11 +195,13 @@ class FTPParallelDownloader:
         # Create progress callback wrapper for this specific file
         file_progress_callback = None
         if progress_callback:
+
             def wrapped_callback(progress_info: FTPProgressInfo) -> None:
                 if asyncio.iscoroutinefunction(progress_callback):
                     asyncio.create_task(progress_callback(request.url, progress_info))
                 else:
                     progress_callback(request.url, progress_info)
+
             file_progress_callback = wrapped_callback
 
         # Retry logic
@@ -204,20 +210,22 @@ class FTPParallelDownloader:
             try:
                 if request.operation == "download":
                     if request.local_path is None:
-                        raise FTPError("Local path required for download operation", request.url)
+                        raise FTPError(
+                            "Local path required for download operation", request.url
+                        )
 
                     # Use streaming downloader for large files or if configured
-                    if config.max_file_size and config.max_file_size > 10 * 1024 * 1024:  # 10MB threshold
-                        result = await self.streaming_downloader.download_with_streaming(
-                            request.url,
-                            request.local_path,
-                            file_progress_callback
+                    if (
+                        config.max_file_size and config.max_file_size > 10 * 1024 * 1024
+                    ):  # 10MB threshold
+                        result = (
+                            await self.streaming_downloader.download_with_streaming(
+                                request.url, request.local_path, file_progress_callback
+                            )
                         )
                     else:
                         result = await self.file_operations.download_file(
-                            request.url,
-                            request.local_path,
-                            file_progress_callback
+                            request.url, request.local_path, file_progress_callback
                         )
 
                     return result
@@ -233,7 +241,7 @@ class FTPParallelDownloader:
                         total_bytes=None,
                         response_time=0.0,
                         timestamp=datetime.now(),
-                        files_list=files_list
+                        files_list=files_list,
                     )
 
                 elif request.operation == "info":
@@ -247,25 +255,32 @@ class FTPParallelDownloader:
                         total_bytes=None,
                         response_time=0.0,
                         timestamp=datetime.now(),
-                        file_info=file_info
+                        file_info=file_info,
                     )
 
                 else:
-                    raise FTPError(f"Unsupported operation: {request.operation}", request.url)
+                    raise FTPError(
+                        f"Unsupported operation: {request.operation}", request.url
+                    )
 
             except Exception as e:
                 last_error = e
 
                 # Check if error is retryable
-                if attempt < config.max_retries and ErrorHandler.is_retryable_ftp_error(e):
+                if (
+                    attempt < config.max_retries
+                    and ErrorHandler.is_retryable_ftp_error(e)
+                ):
                     # Calculate retry delay with exponential backoff
-                    delay = config.retry_delay * (config.retry_backoff_factor ** attempt)
+                    delay = config.retry_delay * (config.retry_backoff_factor**attempt)
                     await asyncio.sleep(delay)
                 else:
                     # Final attempt failed or error is not retryable
                     error_msg = str(last_error)
                     if not isinstance(last_error, FTPError):
-                        last_error = ErrorHandler.handle_ftp_error(last_error, request.url, request.operation)
+                        last_error = ErrorHandler.handle_ftp_error(
+                            last_error, request.url, request.operation
+                        )
                         error_msg = str(last_error)
 
                     return FTPResult(
@@ -278,7 +293,7 @@ class FTPParallelDownloader:
                         response_time=0.0,
                         timestamp=datetime.now(),
                         error=error_msg,
-                        retry_count=attempt
+                        retry_count=attempt,
                     )
 
         # This should never be reached, but just in case
@@ -292,5 +307,5 @@ class FTPParallelDownloader:
             response_time=0.0,
             timestamp=datetime.now(),
             error="Unexpected error in retry logic",
-            retry_count=config.max_retries
+            retry_count=config.max_retries,
         )

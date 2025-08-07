@@ -20,88 +20,90 @@ logger = logging.getLogger(__name__)
 class WebSocketManager:
     """
     Manager for multiple WebSocket connections.
-    
+
     The WebSocketManager provides centralized management of multiple WebSocket
     connections with features like connection pooling, automatic cleanup,
     and connection lifecycle management.
-    
+
     Examples:
         Managing multiple connections:
         ```python
         manager = WebSocketManager()
-        
+
         # Add connections
         config1 = WebSocketConfig(url="wss://api1.example.com/ws")
         config2 = WebSocketConfig(url="wss://api2.example.com/ws")
-        
+
         await manager.add_connection("api1", config1)
         await manager.add_connection("api2", config2)
-        
+
         # Send messages
         await manager.send_text("api1", "Hello API1!")
         await manager.send_text("api2", "Hello API2!")
-        
+
         # Receive messages from all connections
         async for connection_id, message in manager.receive_all_messages():
             print(f"From {connection_id}: {message.data}")
-        
+
         # Cleanup
         await manager.disconnect_all()
         ```
     """
-    
+
     def __init__(self, max_connections: int = 100):
         """
         Initialize WebSocket manager.
-        
+
         Args:
             max_connections: Maximum number of concurrent connections
         """
         self.max_connections = max_connections
         self._connections: Dict[str, WebSocketClient] = {}
         self._connection_tasks: Dict[str, asyncio.Task] = {}
-    
-    async def add_connection(self, connection_id: str, config: WebSocketConfig) -> WebSocketResult:
+
+    async def add_connection(
+        self, connection_id: str, config: WebSocketConfig
+    ) -> WebSocketResult:
         """
         Add a new WebSocket connection.
-        
+
         Args:
             connection_id: Unique identifier for the connection
             config: WebSocket configuration
-            
+
         Returns:
             WebSocketResult with connection status
-            
+
         Raises:
             ValueError: If connection limit exceeded or ID already exists
         """
         if len(self._connections) >= self.max_connections:
             raise ValueError(f"Maximum connections ({self.max_connections}) exceeded")
-        
+
         if connection_id in self._connections:
             raise ValueError(f"Connection '{connection_id}' already exists")
-        
+
         try:
             client = WebSocketClient(config)
             result = await client.connect()
-            
+
             if result.success:
                 self._connections[connection_id] = client
                 logger.info(f"Added WebSocket connection: {connection_id}")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Failed to add connection '{connection_id}': {e}")
             raise
-    
+
     async def remove_connection(self, connection_id: str) -> WebSocketResult:
         """
         Remove a WebSocket connection.
-        
+
         Args:
             connection_id: Connection identifier
-            
+
         Returns:
             WebSocketResult with disconnection status
         """
@@ -109,49 +111,49 @@ class WebSocketManager:
             return WebSocketResult(
                 success=False,
                 connection_state=WebSocketConnectionState.DISCONNECTED,
-                error=f"Connection '{connection_id}' not found"
+                error=f"Connection '{connection_id}' not found",
             )
-        
+
         try:
             client = self._connections[connection_id]
             result = await client.disconnect()
-            
+
             # Remove from tracking
             del self._connections[connection_id]
-            
+
             # Cancel any associated tasks
             if connection_id in self._connection_tasks:
                 task = self._connection_tasks[connection_id]
                 if not task.done():
                     task.cancel()
                 del self._connection_tasks[connection_id]
-            
+
             logger.info(f"Removed WebSocket connection: {connection_id}")
             return result
-            
+
         except Exception as e:
             logger.error(f"Error removing connection '{connection_id}': {e}")
             return WebSocketResult(
                 success=False,
                 connection_state=WebSocketConnectionState.ERROR,
-                error=str(e)
+                error=str(e),
             )
-    
+
     async def send_text(self, connection_id: str, text: str) -> bool:
         """
         Send text message to a specific connection.
-        
+
         Args:
             connection_id: Connection identifier
             text: Text message to send
-            
+
         Returns:
             True if message was sent successfully
         """
         if connection_id not in self._connections:
             logger.warning(f"Connection '{connection_id}' not found")
             return False
-        
+
         try:
             client = self._connections[connection_id]
             await client.send_text(text)
@@ -159,22 +161,22 @@ class WebSocketManager:
         except Exception as e:
             logger.error(f"Error sending text to '{connection_id}': {e}")
             return False
-    
+
     async def send_binary(self, connection_id: str, data: bytes) -> bool:
         """
         Send binary message to a specific connection.
-        
+
         Args:
             connection_id: Connection identifier
             data: Binary data to send
-            
+
         Returns:
             True if message was sent successfully
         """
         if connection_id not in self._connections:
             logger.warning(f"Connection '{connection_id}' not found")
             return False
-        
+
         try:
             client = self._connections[connection_id]
             await client.send_binary(data)
@@ -182,71 +184,75 @@ class WebSocketManager:
         except Exception as e:
             logger.error(f"Error sending binary to '{connection_id}': {e}")
             return False
-    
-    async def broadcast_text(self, text: str, exclude: Optional[List[str]] = None) -> Dict[str, bool]:
+
+    async def broadcast_text(
+        self, text: str, exclude: Optional[List[str]] = None
+    ) -> Dict[str, bool]:
         """
         Broadcast text message to all connections.
-        
+
         Args:
             text: Text message to broadcast
             exclude: List of connection IDs to exclude
-            
+
         Returns:
             Dictionary mapping connection IDs to success status
         """
         exclude = exclude or []
         results = {}
-        
+
         for connection_id in self._connections:
             if connection_id not in exclude:
                 results[connection_id] = await self.send_text(connection_id, text)
-        
+
         return results
-    
-    async def broadcast_binary(self, data: bytes, exclude: Optional[List[str]] = None) -> Dict[str, bool]:
+
+    async def broadcast_binary(
+        self, data: bytes, exclude: Optional[List[str]] = None
+    ) -> Dict[str, bool]:
         """
         Broadcast binary message to all connections.
-        
+
         Args:
             data: Binary data to broadcast
             exclude: List of connection IDs to exclude
-            
+
         Returns:
             Dictionary mapping connection IDs to success status
         """
         exclude = exclude or []
         results = {}
-        
+
         for connection_id in self._connections:
             if connection_id not in exclude:
                 results[connection_id] = await self.send_binary(connection_id, data)
-        
+
         return results
-    
+
     async def receive_all_messages(self):
         """
         Async iterator for receiving messages from all connections.
-        
+
         Yields:
             Tuple of (connection_id, WebSocketMessage)
         """
         # Create tasks for receiving from each connection
         receive_tasks = {}
-        
+
         for connection_id, client in self._connections.items():
             if client.is_connected:
                 task = asyncio.create_task(client.receive_message(timeout=1.0))
                 receive_tasks[connection_id] = task
-        
+
         while receive_tasks:
             try:
                 # Wait for any message
                 done, pending = await asyncio.wait(
                     receive_tasks.values(),
                     return_when=asyncio.FIRST_COMPLETED,
-                    timeout=1.0
+                    timeout=1.0,
                 )
-                
+
                 # Process completed tasks
                 for task in done:
                     # Find which connection this task belongs to
@@ -255,7 +261,7 @@ class WebSocketManager:
                         if t == task:
                             connection_id = cid
                             break
-                    
+
                     if connection_id:
                         try:
                             message = await task
@@ -263,95 +269,97 @@ class WebSocketManager:
                                 yield connection_id, message
                         except Exception as e:
                             logger.error(f"Error receiving from '{connection_id}': {e}")
-                        
+
                         # Remove completed task and create new one if connection still active
                         del receive_tasks[connection_id]
-                        
+
                         client = self._connections.get(connection_id)
                         if client and client.is_connected:
-                            new_task = asyncio.create_task(client.receive_message(timeout=1.0))
+                            new_task = asyncio.create_task(
+                                client.receive_message(timeout=1.0)
+                            )
                             receive_tasks[connection_id] = new_task
-                
+
                 # Clean up disconnected connections
                 to_remove = []
                 for connection_id, client in self._connections.items():
                     if not client.is_connected and connection_id in receive_tasks:
                         receive_tasks[connection_id].cancel()
                         to_remove.append(connection_id)
-                
+
                 for connection_id in to_remove:
                     del receive_tasks[connection_id]
-                
+
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 logger.error(f"Error in receive_all_messages: {e}")
                 break
-        
+
         # Cancel remaining tasks
         for task in receive_tasks.values():
             if not task.done():
                 task.cancel()
-    
+
     async def disconnect_all(self) -> Dict[str, WebSocketResult]:
         """
         Disconnect all WebSocket connections.
-        
+
         Returns:
             Dictionary mapping connection IDs to disconnection results
         """
         results = {}
-        
+
         # Disconnect all connections
         for connection_id in list(self._connections.keys()):
             results[connection_id] = await self.remove_connection(connection_id)
-        
+
         return results
-    
+
     def get_connection_status(self) -> Dict[str, Dict[str, Any]]:
         """
         Get status of all connections.
-        
+
         Returns:
             Dictionary mapping connection IDs to status information
         """
         status = {}
-        
+
         for connection_id, client in self._connections.items():
             status[connection_id] = {
                 "state": client.connection_state.value,
                 "is_connected": client.is_connected,
-                "statistics": client.statistics
+                "statistics": client.statistics,
             }
-        
+
         return status
-    
+
     def list_connections(self) -> List[str]:
         """
         Get list of connection IDs.
-        
+
         Returns:
             List of connection identifiers
         """
         return list(self._connections.keys())
-    
+
     def get_connection(self, connection_id: str) -> Optional[WebSocketClient]:
         """
         Get WebSocket client by connection ID.
-        
+
         Args:
             connection_id: Connection identifier
-            
+
         Returns:
             WebSocketClient instance or None if not found
         """
         return self._connections.get(connection_id)
-    
+
     @property
     def connection_count(self) -> int:
         """Get number of active connections."""
         return len(self._connections)
-    
+
     @property
     def connected_count(self) -> int:
         """Get number of connected WebSocket connections."""

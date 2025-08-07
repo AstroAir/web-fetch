@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from ..models.http import URLAnalysis, HeaderAnalysis
+from ..models.http import HeaderAnalysis, URLAnalysis
 
 
 def is_valid_url(url: str) -> bool:
@@ -34,6 +34,7 @@ def is_valid_url(url: str) -> bool:
         ```
     """
     from ..utils import URLValidator
+
     return URLValidator.is_valid_url(url)
 
 
@@ -66,6 +67,7 @@ def normalize_url(url: str, base_url: Optional[str] = None) -> str:
         ```
     """
     from urllib.parse import urljoin
+
     from ..utils import URLValidator
 
     # Resolve relative URL against base_url if provided
@@ -110,6 +112,7 @@ def analyze_url(url: str) -> URLAnalysis:
         ```
     """
     from ..utils import URLValidator
+
     return URLValidator.analyze_url(url)
 
 
@@ -149,6 +152,7 @@ def analyze_headers(headers: Dict[str, str]) -> HeaderAnalysis:
         ```
     """
     from ..utils import ResponseAnalyzer
+
     return ResponseAnalyzer.analyze_headers(headers)
 
 
@@ -191,4 +195,5 @@ def detect_content_type(headers: Dict[str, str], content: bytes) -> str:
         ```
     """
     from ..utils import ResponseAnalyzer
+
     return ResponseAnalyzer.detect_content_type(headers, content)

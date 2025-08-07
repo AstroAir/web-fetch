@@ -43,7 +43,7 @@ class FTPStreamingDownloader:
         url: str,
         local_path: Path,
         progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None,
-        chunk_size: Optional[int] = None
+        chunk_size: Optional[int] = None,
     ) -> AsyncGenerator[bytes, None]:
         """
         Stream download a file from FTP server with progress tracking.
@@ -75,6 +75,7 @@ class FTPStreamingDownloader:
 
             async with self.connection_pool.get_connection(url) as client:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(url)
                 remote_path = parsed.path
 
@@ -99,14 +100,23 @@ class FTPStreamingDownloader:
                         yield chunk
 
                         # Progress callback
-                        if progress_callback and time.time() - last_progress_time >= 0.1:
+                        if (
+                            progress_callback
+                            and time.time() - last_progress_time >= 0.1
+                        ):
                             elapsed_time = time.time() - start_time
-                            transfer_rate = bytes_transferred / elapsed_time if elapsed_time > 0 else 0
+                            transfer_rate = (
+                                bytes_transferred / elapsed_time
+                                if elapsed_time > 0
+                                else 0
+                            )
 
                             # Estimate time remaining
                             estimated_remaining = None
                             if total_bytes and transfer_rate > 0:
-                                remaining_bytes = total_bytes - (bytes_transferred + resume_position)
+                                remaining_bytes = total_bytes - (
+                                    bytes_transferred + resume_position
+                                )
                                 estimated_remaining = remaining_bytes / transfer_rate
 
                             progress_info = FTPProgressInfo(
@@ -115,7 +125,7 @@ class FTPStreamingDownloader:
                                 transfer_rate=transfer_rate,
                                 elapsed_time=elapsed_time,
                                 estimated_time_remaining=estimated_remaining,
-                                current_file=str(local_path)
+                                current_file=str(local_path),
                             )
 
                             if asyncio.iscoroutinefunction(progress_callback):
@@ -127,16 +137,23 @@ class FTPStreamingDownloader:
 
                         # Rate limiting
                         if self.config.rate_limit_bytes_per_second:
-                            expected_time = bytes_transferred / self.config.rate_limit_bytes_per_second
+                            expected_time = (
+                                bytes_transferred
+                                / self.config.rate_limit_bytes_per_second
+                            )
                             actual_time = time.time() - start_time
                             if actual_time < expected_time:
                                 await asyncio.sleep(expected_time - actual_time)
 
                         # Check max file size limit
-                        if self.config.max_file_size and (bytes_transferred + resume_position) > self.config.max_file_size:
+                        if (
+                            self.config.max_file_size
+                            and (bytes_transferred + resume_position)
+                            > self.config.max_file_size
+                        ):
                             raise FTPError(
                                 f"File size exceeds limit: {self.config.max_file_size} bytes",
-                                url
+                                url,
                             )
 
         except Exception as e:
@@ -148,7 +165,7 @@ class FTPStreamingDownloader:
         self,
         url: str,
         local_path: Path,
-        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[FTPProgressInfo], None]] = None,
     ) -> FTPResult:
         """
         Download a file using streaming with automatic file writing.
@@ -189,29 +206,34 @@ class FTPStreamingDownloader:
                         total_bytes=total_bytes,
                         response_time=time.time() - start_time,
                         timestamp=datetime.now(),
-                        file_info=file_info
+                        file_info=file_info,
                     )
 
             # Open file for writing
             mode = "ab" if resume_position > 0 else "wb"
             async with aiofiles.open(local_path, mode) as local_file:
                 # Stream download and write to file
-                async for chunk in self.stream_download(url, local_path, progress_callback):
+                async for chunk in self.stream_download(
+                    url, local_path, progress_callback
+                ):
                     await local_file.write(chunk)
                     bytes_transferred += len(chunk)
 
             # Verify download if configured
             verification_result = None
             if self.config.verification_method.value != "none":
-                verification_result = await self.file_operations._verify_file(local_path, file_info)
+                verification_result = await self.file_operations._verify_file(
+                    local_path, file_info
+                )
                 if not verification_result.is_valid:
                     from ..exceptions import FTPVerificationError
+
                     raise FTPVerificationError(
                         f"File verification failed: {verification_result.error}",
                         url,
                         verification_method=verification_result.method,
                         expected_value=verification_result.expected_value,
-                        actual_value=verification_result.actual_value
+                        actual_value=verification_result.actual_value,
                     )
 
             return FTPResult(
@@ -224,7 +246,11 @@ class FTPStreamingDownloader:
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
                 file_info=file_info,
-                verification_result=verification_result.verification_details if verification_result else None
+                verification_result=(
+                    verification_result.verification_details
+                    if verification_result
+                    else None
+                ),
             )
 
         except Exception as e:
@@ -241,5 +267,5 @@ class FTPStreamingDownloader:
                 total_bytes=total_bytes,
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
-                error=error
+                error=error,
             )

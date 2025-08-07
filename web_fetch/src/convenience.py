@@ -12,8 +12,6 @@ from typing import Any, Callable, List, Optional
 
 from pydantic import HttpUrl
 
-from .core_fetcher import WebFetcher
-from .streaming_fetcher import StreamingWebFetcher
 from ..models import (
     BatchFetchRequest,
     BatchFetchResult,
@@ -26,12 +24,14 @@ from ..models import (
     StreamRequest,
     StreamResult,
 )
+from .core_fetcher import WebFetcher
+from .streaming_fetcher import StreamingWebFetcher
 
 
 async def fetch_url(
     url: str,
     content_type: ContentType = ContentType.TEXT,
-    config: Optional[FetchConfig] = None
+    config: Optional[FetchConfig] = None,
 ) -> FetchResult:
     """
     Convenience function to fetch a single URL.
@@ -78,7 +78,7 @@ async def fetch_url(
 async def fetch_urls(
     urls: List[str],
     content_type: ContentType = ContentType.TEXT,
-    config: Optional[FetchConfig] = None
+    config: Optional[FetchConfig] = None,
 ) -> BatchFetchResult:
     """
     Convenience function to fetch multiple URLs concurrently.
@@ -123,7 +123,9 @@ async def fetch_urls(
                 print(f"URL {i} failed: {result.error}")
         ```
     """
-    requests = [FetchRequest(url=HttpUrl(url), content_type=content_type) for url in urls]
+    requests = [
+        FetchRequest(url=HttpUrl(url), content_type=content_type) for url in urls
+    ]
     batch_request = BatchFetchRequest(requests=requests, config=config)
 
     async with WebFetcher(config) as fetcher:
@@ -135,7 +137,7 @@ async def download_file(
     output_path: Path,
     chunk_size: int = 8192,
     progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
-    config: Optional[FetchConfig] = None
+    config: Optional[FetchConfig] = None,
 ) -> StreamResult:
     """
     Convenience function to download a file with progress tracking.
@@ -189,14 +191,11 @@ async def download_file(
         ```
     """
     streaming_config = StreamingConfig(
-        chunk_size=chunk_size,
-        enable_progress=progress_callback is not None
+        chunk_size=chunk_size, enable_progress=progress_callback is not None
     )
 
     request = StreamRequest(
-        url=HttpUrl(url),
-        output_path=output_path,
-        streaming_config=streaming_config
+        url=HttpUrl(url), output_path=output_path, streaming_config=streaming_config
     )
 
     async with StreamingWebFetcher(config) as streaming_fetcher:
@@ -207,7 +206,7 @@ async def fetch_with_cache(
     url: str,
     content_type: ContentType = ContentType.TEXT,
     cache_config: Optional[Any] = None,  # CacheConfig from utils
-    config: Optional[FetchConfig] = None
+    config: Optional[FetchConfig] = None,
 ) -> FetchResult:
     """
     Convenience function to fetch a URL with caching.
@@ -265,8 +264,8 @@ async def fetch_with_cache(
         )
         ```
     """
-    from ..utils import SimpleCache
     from ..models import CacheConfig
+    from ..utils import SimpleCache
 
     if cache_config is None:
         cache_config = CacheConfig()
@@ -281,9 +280,10 @@ async def fetch_with_cache(
         content = cached_entry.response_data
         if cached_entry.compressed:
             import gzip
+
             content = gzip.decompress(content)
             if content_type in (ContentType.TEXT, ContentType.JSON, ContentType.HTML):
-                content = content.decode('utf-8')
+                content = content.decode("utf-8")
 
         return FetchResult(
             url=url,
@@ -292,7 +292,7 @@ async def fetch_with_cache(
             content=content,
             content_type=content_type,
             response_time=0.0,  # Cached response
-            timestamp=cached_entry.timestamp
+            timestamp=cached_entry.timestamp,
         )
 
     # Fetch from network

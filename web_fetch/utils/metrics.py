@@ -55,7 +55,7 @@ class AggregatedMetrics:
     total_response_time: float = 0.0
     total_response_size: int = 0
 
-    min_response_time: float = float('inf')
+    min_response_time: float = float("inf")
     max_response_time: float = 0.0
 
     status_code_counts: Dict[int, int] = field(default_factory=lambda: defaultdict(int))
@@ -114,10 +114,10 @@ class AggregatedMetrics:
         # Extract host from URL
         try:
             parsed = urlparse(metrics.url)
-            host = parsed.netloc or parsed.hostname or 'unknown'
+            host = parsed.netloc or parsed.hostname or "unknown"
             self.host_counts[host] += 1
         except Exception:
-            self.host_counts['unknown'] += 1
+            self.host_counts["unknown"] += 1
 
 
 class MetricsCollector:
@@ -137,9 +137,15 @@ class MetricsCollector:
         self._metrics_history: Deque[RequestMetrics] = deque(maxlen=max_history)
         self._start_time = datetime.now()
 
-    def record_request(self, url: str, method: str, status_code: int,
-                       response_time: float, response_size: int = 0,
-                       error: Optional[str] = None) -> None:
+    def record_request(
+        self,
+        url: str,
+        method: str,
+        status_code: int,
+        response_time: float,
+        response_size: int = 0,
+        error: Optional[str] = None,
+    ) -> None:
         """
         Record metrics for a single request.
 
@@ -158,7 +164,7 @@ class MetricsCollector:
             response_time=response_time,
             response_size=response_size,
             timestamp=datetime.now(),
-            error=error
+            error=error,
         )
 
         self._metrics_history.append(metrics)
@@ -168,14 +174,17 @@ class MetricsCollector:
         """Remove metrics older than retention period."""
         cutoff_time = datetime.now() - timedelta(hours=self.retention_hours)
 
-        while (self._metrics_history and
-               self._metrics_history[0].timestamp < cutoff_time):
+        while (
+            self._metrics_history and self._metrics_history[0].timestamp < cutoff_time
+        ):
             self._metrics_history.popleft()
 
-    def get_aggregated_metrics(self,
-                               since: Optional[datetime] = None,
-                               until: Optional[datetime] = None,
-                               host_filter: Optional[str] = None) -> AggregatedMetrics:
+    def get_aggregated_metrics(
+        self,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        host_filter: Optional[str] = None,
+    ) -> AggregatedMetrics:
         """
         Get aggregated metrics for a time period.
 
@@ -200,7 +209,7 @@ class MetricsCollector:
             if host_filter:
                 try:
                     parsed = urlparse(metrics.url)
-                    host = parsed.netloc or parsed.hostname or 'unknown'
+                    host = parsed.netloc or parsed.hostname or "unknown"
                     if host_filter.lower() not in host.lower():
                         continue
                 except Exception:
@@ -224,10 +233,13 @@ class MetricsCollector:
         """Get metrics for the last 24 hours."""
         return self.get_hourly_metrics(hours=24)
 
-    def get_host_breakdown(self, since: Optional[datetime] = None) -> Dict[str, AggregatedMetrics]:
+    def get_host_breakdown(
+        self, since: Optional[datetime] = None
+    ) -> Dict[str, AggregatedMetrics]:
         """Get metrics broken down by host."""
         host_metrics: Dict[str, AggregatedMetrics] = defaultdict(
-            lambda: AggregatedMetrics())
+            lambda: AggregatedMetrics()
+        )
 
         for metrics in self._metrics_history:
             if since and metrics.timestamp < since:
@@ -235,14 +247,16 @@ class MetricsCollector:
 
             try:
                 parsed = urlparse(metrics.url)
-                host = parsed.netloc or parsed.hostname or 'unknown'
+                host = parsed.netloc or parsed.hostname or "unknown"
                 host_metrics[host].add_request(metrics)
             except Exception:
-                host_metrics['unknown'].add_request(metrics)
+                host_metrics["unknown"].add_request(metrics)
 
         return dict(host_metrics)
 
-    def get_performance_percentiles(self, percentiles: Optional[List[float]] = None) -> Dict[str, float]:
+    def get_performance_percentiles(
+        self, percentiles: Optional[List[float]] = None
+    ) -> Dict[str, float]:
         """
         Calculate response time percentiles.
 
@@ -288,7 +302,7 @@ class MetricsCollector:
         return {
             "error_messages": dict(error_counts),
             "error_status_codes": dict(status_counts),
-            "total_errors": sum(error_counts.values()) + sum(status_counts.values())
+            "total_errors": sum(error_counts.values()) + sum(status_counts.values()),
         }
 
     def get_system_health(self) -> Dict[str, Any]:
@@ -304,8 +318,12 @@ class MetricsCollector:
             "recent_avg_response_time": recent_metrics.average_response_time,
             "hourly_avg_response_time": hourly_metrics.average_response_time,
             "performance_percentiles": self.get_performance_percentiles(),
-            "active_hosts": len(self.get_host_breakdown(since=datetime.now() - timedelta(hours=1))),
-            "error_summary": self.get_error_summary(since=datetime.now() - timedelta(hours=1))
+            "active_hosts": len(
+                self.get_host_breakdown(since=datetime.now() - timedelta(hours=1))
+            ),
+            "error_summary": self.get_error_summary(
+                since=datetime.now() - timedelta(hours=1)
+            ),
         }
 
     def reset(self) -> None:
@@ -318,9 +336,14 @@ class MetricsCollector:
 _global_collector = MetricsCollector()
 
 
-def record_request_metrics(url: str, method: str, status_code: int,
-                           response_time: float, response_size: int = 0,
-                           error: Optional[str] = None) -> None:
+def record_request_metrics(
+    url: str,
+    method: str,
+    status_code: int,
+    response_time: float,
+    response_size: int = 0,
+    error: Optional[str] = None,
+) -> None:
     """
     Convenience function to record request metrics.
 
@@ -358,7 +381,8 @@ def record_request_metrics(url: str, method: str, status_code: int,
         ```
     """
     _global_collector.record_request(
-        url, method, status_code, response_time, response_size, error)
+        url, method, status_code, response_time, response_size, error
+    )
 
 
 def get_metrics_summary() -> Dict[str, Any]:

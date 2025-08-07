@@ -15,7 +15,6 @@ from typing import Callable, Optional, Union
 import aiofiles
 from aiohttp import ClientTimeout
 
-from .core_fetcher import WebFetcher
 from ..exceptions import WebFetchError
 from ..models import (
     FetchConfig,
@@ -24,6 +23,7 @@ from ..models import (
     StreamResult,
 )
 from ..utils import RateLimiter, SimpleCache
+from .core_fetcher import WebFetcher
 
 
 class StreamingWebFetcher(WebFetcher):
@@ -123,7 +123,7 @@ class StreamingWebFetcher(WebFetcher):
     async def stream_fetch(
         self,
         request: StreamRequest,
-        progress_callback: Optional[Callable[[ProgressInfo], None]] = None
+        progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> StreamResult:
         """
         Stream fetch a URL with chunked reading and progress tracking.
@@ -176,7 +176,11 @@ class StreamingWebFetcher(WebFetcher):
         method: str = request.method
         url: str = str(request.url)
         headers: dict = request.headers or {}
-        timeout: Optional[ClientTimeout] = ClientTimeout(total=request.timeout_override) if request.timeout_override else None
+        timeout: Optional[ClientTimeout] = (
+            ClientTimeout(total=request.timeout_override)
+            if request.timeout_override
+            else None
+        )
 
         # Prepare data/json parameters
         json_data: Optional[dict] = None
@@ -197,31 +201,37 @@ class StreamingWebFetcher(WebFetcher):
                 headers=headers,
                 json=json_data,
                 data=data,
-                timeout=timeout
+                timeout=timeout,
             ) as response:
                 # Get content length if available
                 total_bytes = None
-                if 'content-length' in response.headers:
+                if "content-length" in response.headers:
                     try:
-                        total_bytes = int(response.headers['content-length'])
+                        total_bytes = int(response.headers["content-length"])
                     except ValueError:
                         pass
 
                 # Check file size limit
-                if (request.streaming_config.max_file_size and
-                    total_bytes and
-                    total_bytes > request.streaming_config.max_file_size):
-                    raise WebFetchError(f"File size {total_bytes} exceeds limit {request.streaming_config.max_file_size}")
+                if (
+                    request.streaming_config.max_file_size
+                    and total_bytes
+                    and total_bytes > request.streaming_config.max_file_size
+                ):
+                    raise WebFetchError(
+                        f"File size {total_bytes} exceeds limit {request.streaming_config.max_file_size}"
+                    )
 
                 # Open output file if specified
                 output_file = None
                 if request.output_path:
                     request.output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_file = await aiofiles.open(request.output_path, 'wb')
+                    output_file = await aiofiles.open(request.output_path, "wb")
 
                 try:
                     # Stream content in chunks
-                    async for chunk in response.content.iter_chunked(request.streaming_config.chunk_size):
+                    async for chunk in response.content.iter_chunked(
+                        request.streaming_config.chunk_size
+                    ):
                         if not chunk:
                             break
 
@@ -236,11 +246,18 @@ class StreamingWebFetcher(WebFetcher):
                         current_time = time.time()
                         elapsed_time = current_time - start_time
 
-                        if (request.streaming_config.enable_progress and
-                            progress_callback and
-                            (current_time - last_progress_time) >= request.streaming_config.progress_interval):
+                        if (
+                            request.streaming_config.enable_progress
+                            and progress_callback
+                            and (current_time - last_progress_time)
+                            >= request.streaming_config.progress_interval
+                        ):
 
-                            download_speed = bytes_downloaded / elapsed_time if elapsed_time > 0 else 0
+                            download_speed = (
+                                bytes_downloaded / elapsed_time
+                                if elapsed_time > 0
+                                else 0
+                            )
                             percentage = None
                             eta = None
 
@@ -257,7 +274,7 @@ class StreamingWebFetcher(WebFetcher):
                                 elapsed_time=elapsed_time,
                                 download_speed=download_speed,
                                 eta=eta,
-                                percentage=percentage
+                                percentage=percentage,
                             )
 
                             progress_callback(progress_info)
@@ -269,8 +286,12 @@ class StreamingWebFetcher(WebFetcher):
 
                 # Create final progress info
                 final_elapsed = time.time() - start_time
-                final_speed = bytes_downloaded / final_elapsed if final_elapsed > 0 else 0
-                final_percentage = 100.0 if total_bytes and bytes_downloaded >= total_bytes else None
+                final_speed = (
+                    bytes_downloaded / final_elapsed if final_elapsed > 0 else 0
+                )
+                final_percentage = (
+                    100.0 if total_bytes and bytes_downloaded >= total_bytes else None
+                )
 
                 final_progress = ProgressInfo(
                     bytes_downloaded=bytes_downloaded,
@@ -279,7 +300,7 @@ class StreamingWebFetcher(WebFetcher):
                     elapsed_time=final_elapsed,
                     download_speed=final_speed,
                     eta=0.0 if final_percentage == 100.0 else None,
-                    percentage=final_percentage
+                    percentage=final_percentage,
                 )
 
                 # Call progress callback one final time if enabled
@@ -294,7 +315,7 @@ class StreamingWebFetcher(WebFetcher):
                     total_bytes=total_bytes,
                     output_path=request.output_path,
                     response_time=final_elapsed,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
                 )
 
         except Exception as e:
@@ -308,5 +329,5 @@ class StreamingWebFetcher(WebFetcher):
                 output_path=request.output_path,
                 response_time=time.time() - start_time,
                 timestamp=datetime.now(),
-                error=error_msg
+                error=error_msg,
             )

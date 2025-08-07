@@ -16,16 +16,15 @@ from ..models import RateLimitConfig, RateLimitState
 
 class RateLimiter:
     """Rate limiter using token bucket algorithm."""
-    
+
     def __init__(self, config: RateLimitConfig):
         """Initialize rate limiter with configuration."""
         self.config = config
         self._global_state = RateLimitState(
-            tokens=config.burst_size,
-            last_update=datetime.now()
+            tokens=config.burst_size, last_update=datetime.now()
         )
         self._host_states: Dict[str, RateLimitState] = {}
-    
+
     def _get_host_from_url(self, url: str) -> str:
         """
         Extract host from URL.
@@ -42,8 +41,8 @@ class RateLimiter:
         try:
             return urlparse(url).netloc.lower()
         except Exception:
-            return 'unknown'
-    
+            return "unknown"
+
     async def acquire(self, url: str) -> None:
         """
         Acquire permission to make a request.
@@ -72,8 +71,7 @@ class RateLimiter:
             if host not in self._host_states:
                 # Start with full token bucket for new hosts
                 self._host_states[host] = RateLimitState(
-                    tokens=self.config.burst_size,
-                    last_update=datetime.now()
+                    tokens=self.config.burst_size, last_update=datetime.now()
                 )
             state = self._host_states[host]
         else:
@@ -91,7 +89,7 @@ class RateLimiter:
         # Consume one token from the bucket for this request
         # This decreases available tokens and updates request statistics
         state.consume_token()
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """
         Get rate limiter statistics.
@@ -116,14 +114,11 @@ class RateLimiter:
             ```
         """
         return {
-            'global_tokens': self._global_state.tokens,
-            'global_requests': self._global_state.requests_made,
-            'host_count': len(self._host_states),
-            'host_stats': {
-                host: {
-                    'tokens': state.tokens,
-                    'requests': state.requests_made
-                }
+            "global_tokens": self._global_state.tokens,
+            "global_requests": self._global_state.requests_made,
+            "host_count": len(self._host_states),
+            "host_stats": {
+                host: {"tokens": state.tokens, "requests": state.requests_made}
                 for host, state in self._host_states.items()
-            }
+            },
         }
