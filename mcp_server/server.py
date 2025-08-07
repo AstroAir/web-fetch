@@ -7,8 +7,7 @@ WebFetch functionality as tools for LLM consumption.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Union, Any, Literal
-from urllib.parse import urlparse
+from typing import Dict, List, Optional, Union, Any, Literal, Callable
 
 from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field, HttpUrl
@@ -30,7 +29,23 @@ from web_fetch import (
     normalize_url,
     analyze_url,
     analyze_headers,
-    detect_content_type
+    detect_content_type,
+    # New imports for enhanced features
+    BatchManager,
+    BatchRequest,
+    BatchConfig,
+    BatchPriority,
+    HTTPMethodHandler,
+    HTTPMethod,
+    FileUploadHandler,
+    DownloadHandler,
+    ResumableDownloadHandler,
+    PaginationHandler,
+    PaginationStrategy,
+    HeaderManager,
+    CookieManager,
+    config_manager,
+    GlobalConfig,
 )
 
 # Import advanced utilities
@@ -63,9 +78,16 @@ def create_mcp_server() -> FastMCP:
         - web_fetch: Fetch content from a single URL with various parsing options
         - web_fetch_batch: Fetch content from multiple URLs concurrently
         - web_fetch_enhanced: Advanced fetching with caching, circuit breakers, and more features
+        - batch_fetch_advanced: Advanced batch processing with priority queues and scheduling
+        - upload_file: Upload files to web endpoints with progress tracking
+        - download_file: Download files with resume capability and integrity verification
+        - paginate_api: Handle API pagination automatically
+        - manage_headers: Advanced header management with presets and rules
+        - manage_cookies: Cookie management with persistence and security
         - validate_url: Validate and analyze URL structure
         - analyze_headers: Analyze HTTP response headers
         - detect_content_type: Detect content type from URL or headers
+        - configure_system: Configure global system settings
 
         The server supports various content types (TEXT, JSON, HTML, RAW) and provides
         comprehensive error handling, retry logic, and performance optimizations.
@@ -743,6 +765,463 @@ def create_mcp_server() -> FastMCP:
                     "headers": headers,
                     "content_sample_length": len(content_sample) if content_sample else 0
                 }
+            }
+
+    @mcp.tool(
+        name="batch_fetch_advanced",
+        description="Advanced batch processing with priority queues, scheduling, and progress tracking",
+        tags={"batch", "advanced", "priority", "scheduling"}
+    )
+    async def batch_fetch_advanced_tool(
+        requests: Annotated[
+            List[Dict[str, Any]],
+            Field(description="List of request configurations with URLs and options", min_length=1, max_length=100)
+        ],
+        priority: Annotated[
+            Literal["LOW", "NORMAL", "HIGH", "URGENT"],
+            Field(description="Batch priority level")
+        ] = "NORMAL",
+        max_concurrent: Annotated[
+            int,
+            Field(description="Maximum concurrent requests", ge=1, le=50)
+        ] = 10,
+        timeout: Annotated[
+            float,
+            Field(description="Total batch timeout in seconds", ge=1.0, le=3600.0)
+        ] = 300.0,
+        ctx: Optional[Context] = None
+    ) -> Dict[str, Any]:
+        """
+        Process multiple requests with advanced batch management.
+
+        This tool provides sophisticated batch processing with priority queues,
+        intelligent scheduling, and comprehensive progress tracking.
+        """
+        try:
+            if ctx:
+                await ctx.info(f"Starting advanced batch processing for {len(requests)} requests")
+
+            # Create batch configuration
+            batch_config = BatchConfig(
+                max_concurrent_requests_per_batch=max_concurrent,
+                batch_timeout=timeout,
+                enable_metrics=True,
+                enable_progress_tracking=True
+            )
+
+            # Create batch manager
+            batch_manager = BatchManager(batch_config)
+            await batch_manager.start()
+
+            try:
+                # Convert requests to FetchRequest objects
+                fetch_requests = []
+                for i, req in enumerate(requests):
+                    if isinstance(req, dict) and 'url' in req:
+                        # Convert string URL to HttpUrl
+                        url_str = req['url']
+                        if not is_valid_url(url_str):
+                            raise ValueError(f"Invalid URL at index {i}: {url_str}")
+                        
+                        # Create HttpUrl object
+                        http_url = HttpUrl(url_str)
+                        
+                        fetch_req = FetchRequest(
+                            url=http_url,
+                            method=req.get('method', 'GET'),
+                            headers=req.get('headers'),
+                            params=req.get('params')
+                        )
+                        fetch_requests.append(fetch_req)
+                    else:
+                        raise ValueError(f"Invalid request format at index {i}")
+
+                # Create batch request
+                batch_request = BatchRequest(
+                    requests=fetch_requests,
+                    priority=BatchPriority[priority],
+                    max_concurrent=max_concurrent,
+                    timeout=timeout
+                )
+
+                # Submit batch
+                batch_id = await batch_manager.submit_batch(batch_request)
+
+                # Wait for completion with progress updates
+                while True:
+                    status = await batch_manager.get_batch_status(batch_id)
+                    if status and status.value in ['completed', 'failed', 'cancelled']:
+                        break
+
+                    # Report progress
+                    progress = await batch_manager.get_batch_progress(batch_id)
+                    if progress and ctx:
+                        await ctx.report_progress(
+                            progress.completed_requests + progress.failed_requests,
+                            progress.total_requests
+                        )
+
+                    await asyncio.sleep(0.5)
+
+                # Get final result
+                result = await batch_manager.get_batch_result(batch_id)
+
+                if result:
+                    return {
+                        "success": True,
+                        "batch_id": batch_id,
+                        "status": result.status.value,
+                        "total_requests": result.total_requests,
+                        "successful_requests": result.successful_requests,
+                        "failed_requests": result.failed_requests,
+                        "success_rate": result.success_rate,
+                        "total_time": result.total_time,
+                        "average_response_time": result.average_response_time,
+                        "results": [
+                            {
+                                "url": str(r.url),
+                                "status_code": r.status_code,
+                                "success": r.is_success,
+                                "content": r.content if r.is_success else None,
+                                "error": r.error if not r.is_success else None
+                            }
+                            for r in result.results
+                        ]
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to get batch result",
+                        "batch_id": batch_id
+                    }
+
+            finally:
+                await batch_manager.stop()
+
+        except Exception as e:
+            error_msg = f"Advanced batch processing error: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "requests_count": len(requests)
+            }
+
+    @mcp.tool(
+        name="download_file",
+        description="Download files with resume capability, progress tracking, and integrity verification",
+        tags={"download", "file", "resume", "integrity"}
+    )
+    async def download_file_tool(
+        url: Annotated[str, Field(description="URL of the file to download")],
+        output_path: Annotated[str, Field(description="Local path where to save the file")],
+        resume: Annotated[
+            bool,
+            Field(description="Whether to resume partial downloads")
+        ] = True,
+        verify_checksum: Annotated[
+            bool,
+            Field(description="Whether to verify file integrity")
+        ] = False,
+        expected_checksum: Annotated[
+            Optional[str],
+            Field(description="Expected file checksum for verification")
+        ] = None,
+        max_file_size: Annotated[
+            Optional[int],
+            Field(description="Maximum file size in bytes")
+        ] = None,
+        ctx: Optional[Context] = None
+    ) -> Dict[str, Any]:
+        """
+        Download a file with advanced features.
+
+        This tool provides robust file downloading with resume capability,
+        progress tracking, and integrity verification.
+        """
+        try:
+            if ctx:
+                await ctx.info(f"Starting download: {url} -> {output_path}")
+
+            # Create download configuration
+            from web_fetch.http.download import DownloadConfig
+
+            config = DownloadConfig(
+                verify_checksum=verify_checksum,
+                expected_checksum=expected_checksum,
+                max_file_size=max_file_size,
+                overwrite_existing=True
+            )
+
+            # Choose handler based on resume capability
+            if resume:
+                handler: ResumableDownloadHandler = ResumableDownloadHandler(config)
+                download_method = handler.download_file_resumable
+            else:
+                handler = DownloadHandler(config)
+                download_method = handler.download_file
+
+            # Progress callback with proper type annotation
+            def progress_callback(progress: Any) -> None:
+                if ctx:
+                    asyncio.create_task(ctx.report_progress(
+                        progress.bytes_downloaded,
+                        progress.total_bytes or progress.bytes_downloaded
+                    ))
+
+            # Perform download
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                result = await download_method(
+                    session=session,
+                    url=url,
+                    output_path=output_path,
+                    progress_callback=progress_callback
+                )
+
+            return {
+                "success": result.success,
+                "file_path": str(result.file_path),
+                "bytes_downloaded": result.bytes_downloaded,
+                "total_bytes": result.total_bytes,
+                "download_time": result.download_time,
+                "average_speed": result.average_speed,
+                "speed_human": result.speed_human,
+                "checksum": result.checksum,
+                "error": result.error
+            }
+
+        except Exception as e:
+            error_msg = f"Download error: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "url": url,
+                "output_path": output_path
+            }
+
+    @mcp.tool(
+        name="paginate_api",
+        description="Automatically handle API pagination to fetch all pages of data",
+        tags={"pagination", "api", "automatic"}
+    )
+    async def paginate_api_tool(
+        base_url: Annotated[str, Field(description="Base API URL")],
+        strategy: Annotated[
+            Literal["offset_limit", "page_size", "cursor", "link_header"],
+            Field(description="Pagination strategy to use")
+        ] = "page_size",
+        max_pages: Annotated[
+            int,
+            Field(description="Maximum pages to fetch", ge=1, le=100)
+        ] = 10,
+        page_size: Annotated[
+            int,
+            Field(description="Items per page", ge=1, le=1000)
+        ] = 20,
+        headers: Annotated[
+            Optional[Dict[str, str]],
+            Field(description="HTTP headers to include")
+        ] = None,
+        params: Annotated[
+            Optional[Dict[str, str]],
+            Field(description="Base query parameters")
+        ] = None,
+        data_field: Annotated[
+            str,
+            Field(description="Field name containing the data array")
+        ] = "data",
+        ctx: Optional[Context] = None
+    ) -> Dict[str, Any]:
+        """
+        Automatically handle API pagination.
+
+        This tool intelligently handles different pagination strategies
+        to fetch all available data from paginated APIs.
+        """
+        try:
+            if ctx:
+                await ctx.info(f"Starting pagination for: {base_url}")
+
+            from web_fetch.http.pagination import PaginationConfig, PaginationStrategy as PagStrategy
+            from web_fetch.src.core_fetcher import WebFetcher
+
+            # Create pagination configuration
+            config = PaginationConfig(
+                strategy=PagStrategy[strategy.upper()],
+                max_pages=max_pages,
+                page_size=page_size,
+                data_field=data_field
+            )
+
+            # Create pagination handler
+            handler = PaginationHandler(config)
+
+            # Convert string URL to HttpUrl
+            if not is_valid_url(base_url):
+                raise ValueError(f"Invalid base URL: {base_url}")
+            
+            http_url = HttpUrl(base_url)
+
+            # Create base request
+            base_request = FetchRequest(
+                url=http_url,
+                headers=headers,
+                params=params
+            )
+
+            # Fetch all pages
+            async with WebFetcher() as fetcher:
+                result = await handler.fetch_all_pages(fetcher, base_request)
+
+            return {
+                "success": True,
+                "total_items": len(result.data),
+                "total_pages": result.total_pages,
+                "has_more": result.has_more,
+                "data": result.data,
+                "pagination_info": {
+                    "strategy": strategy,
+                    "pages_fetched": result.total_pages,
+                    "items_per_page": page_size,
+                    "total_requests": len(result.responses)
+                },
+                "responses": [
+                    {
+                        "url": str(r.url),
+                        "status_code": r.status_code,
+                        "success": r.is_success
+                    }
+                    for r in result.responses
+                ]
+            }
+
+        except Exception as e:
+            error_msg = f"Pagination error: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "base_url": base_url,
+                "strategy": strategy
+            }
+
+    @mcp.tool(
+        name="configure_system",
+        description="Configure global system settings for web fetching",
+        tags={"configuration", "settings", "global"}
+    )
+    async def configure_system_tool(
+        logging_level: Annotated[
+            Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]],
+            Field(description="Set logging level")
+        ] = None,
+        max_connections: Annotated[
+            Optional[int],
+            Field(description="Maximum total connections", ge=1, le=1000)
+        ] = None,
+        connection_timeout: Annotated[
+            Optional[float],
+            Field(description="Connection timeout in seconds", ge=1.0, le=300.0)
+        ] = None,
+        enable_caching: Annotated[
+            Optional[bool],
+            Field(description="Enable response caching")
+        ] = None,
+        enable_metrics: Annotated[
+            Optional[bool],
+            Field(description="Enable metrics collection")
+        ] = None,
+        user_agent: Annotated[
+            Optional[str],
+            Field(description="Default User-Agent header")
+        ] = None,
+        ctx: Optional[Context] = None
+    ) -> Dict[str, Any]:
+        """
+        Configure global system settings.
+
+        This tool allows configuration of global settings that affect
+        all web fetching operations.
+        """
+        try:
+            if ctx:
+                await ctx.info("Updating system configuration")
+
+            # Get current configuration
+            current_config = config_manager.get_config()
+
+            # Prepare updates with proper typing
+            updates: Dict[str, Any] = {}
+
+            if logging_level:
+                updates['logging'] = {'level': logging_level}
+
+            if max_connections:
+                performance_config = updates.setdefault('performance', {})
+                performance_config['max_connections'] = max_connections
+
+            if connection_timeout:
+                performance_config = updates.setdefault('performance', {})
+                performance_config['connection_timeout'] = connection_timeout
+
+            if enable_caching is not None:
+                features_config = updates.setdefault('features', {})
+                features_config['enable_caching'] = enable_caching
+
+            if enable_metrics is not None:
+                features_config = updates.setdefault('features', {})
+                features_config['enable_metrics'] = enable_metrics
+
+            if user_agent:
+                updates['user_agent'] = user_agent
+
+            # Apply updates if any
+            if updates:
+                config_manager.update_config(updates, validate=True, persist=False)
+
+                # Get updated configuration
+                updated_config = config_manager.get_config()
+
+                return {
+                    "success": True,
+                    "message": "Configuration updated successfully",
+                    "updates_applied": updates,
+                    "current_config": {
+                        "logging_level": updated_config.logging.level.value,
+                        "max_connections": updated_config.performance.max_connections,
+                        "connection_timeout": updated_config.performance.connection_timeout,
+                        "enable_caching": updated_config.features.enable_caching,
+                        "enable_metrics": updated_config.features.enable_metrics,
+                        "user_agent": updated_config.user_agent
+                    }
+                }
+            else:
+                # No updates, return current configuration
+                return {
+                    "success": True,
+                    "message": "No updates specified, returning current configuration",
+                    "current_config": {
+                        "logging_level": current_config.logging.level.value,
+                        "max_connections": current_config.performance.max_connections,
+                        "connection_timeout": current_config.performance.connection_timeout,
+                        "enable_caching": current_config.features.enable_caching,
+                        "enable_metrics": current_config.features.enable_metrics,
+                        "user_agent": current_config.user_agent
+                    }
+                }
+
+        except Exception as e:
+            error_msg = f"Configuration error: {str(e)}"
+            if ctx:
+                await ctx.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
             }
 
     return mcp

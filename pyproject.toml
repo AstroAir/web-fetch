@@ -31,15 +31,17 @@ dependencies = [
     "aiofiles>=23.0.0",
     "aioftp>=0.21.0",
     # New resource type dependencies
-    "PyPDF2>=3.0.0",           # PDF parsing
-    "Pillow>=10.0.0",          # Image processing
-    "feedparser>=6.0.0",       # RSS/Atom feed parsing
-    "pandas>=2.0.0",           # CSV parsing and data handling
-    "html2text>=2020.1.16",    # HTML to Markdown conversion
-    "python-magic>=0.4.27",    # Enhanced content type detection
-    "nltk>=3.8.0",             # Text processing and summarization
-    "scikit-learn>=1.3.0",     # Text analysis and feature extraction
-    "playwright>=1.40.0",      # JavaScript-rendered content support
+    "PyPDF2>=3.0.0", # PDF parsing
+    "Pillow>=10.0.0", # Image processing
+    "feedparser>=6.0.0", # RSS/Atom feed parsing
+    "pandas>=2.0.0", # CSV parsing and data handling
+    "html2text>=2020.1.16", # HTML to Markdown conversion
+    "python-magic>=0.4.27", # Enhanced content type detection
+    "nltk>=3.8.0", # Text processing and summarization
+    "scikit-learn>=1.3.0", # Text analysis and feature extraction
+    "playwright>=1.40.0", # JavaScript-rendered content support
+    "tavily-python>=0.7.10",
+    "firecrawl-py>=2.16.3",
 ]
 
 [project.optional-dependencies]

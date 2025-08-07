@@ -103,6 +103,86 @@ from .ftp import (
     ftp_list_directory,
 )
 
+# Authentication support
+from .auth import (
+    AuthMethod,
+    AuthConfig,
+    AuthResult,
+    APIKeyAuth,
+    APIKeyConfig,
+    OAuth2Auth,
+    OAuth2Config,
+    OAuthTokenResponse,
+    JWTAuth,
+    JWTConfig,
+    BasicAuth,
+    BasicAuthConfig,
+    BearerTokenAuth,
+    BearerTokenConfig,
+    CustomAuth,
+    CustomAuthConfig,
+    AuthManager,
+)
+
+# Configuration management
+from .config import (
+    ConfigManager,
+    config_manager,
+    GlobalConfig,
+    LoggingConfig,
+    SecurityConfig,
+    PerformanceConfig,
+    FeatureFlags,
+    EnvironmentConfig,
+    ConfigLoader,
+    ConfigValidator,
+)
+
+# Enhanced logging
+from .logging import (
+    LoggingManager,
+    setup_logging,
+    StructuredFormatter,
+    ColoredFormatter,
+    CompactFormatter,
+    AsyncFileHandler,
+    RotatingAsyncFileHandler,
+    MetricsHandler,
+    SensitiveDataFilter,
+    RateLimitFilter,
+    ComponentFilter,
+)
+
+# Enhanced batch operations
+from .batch import (
+    BatchManager,
+    BatchRequest,
+    BatchResult,
+    BatchConfig,
+    BatchPriority,
+    BatchStatus,
+    BatchMetrics,
+    BatchScheduler,
+    BatchProcessor,
+    PriorityQueue,
+)
+
+# Enhanced HTTP support
+from .http import (
+    HTTPMethodHandler,
+    HTTPMethod,
+    FileUploadHandler,
+    MultipartUploadHandler,
+    DownloadHandler,
+    ResumableDownloadHandler,
+    PaginationHandler,
+    PaginationStrategy,
+    HeaderManager,
+    HeaderPresets,
+    CookieManager,
+    CookieJar,
+)
+
 # Enhanced functionality (now integrated into main fetcher)
 from .fetcher import (
     enhanced_fetch_url,
@@ -210,6 +290,76 @@ __all__ = [
     "CacheConfig",
     "RateLimitConfig",
     "SessionConfig",
+
+    # Authentication
+    "AuthMethod",
+    "AuthConfig",
+    "AuthResult",
+    "APIKeyAuth",
+    "APIKeyConfig",
+    "OAuth2Auth",
+    "OAuth2Config",
+    "OAuthTokenResponse",
+    "JWTAuth",
+    "JWTConfig",
+    "BasicAuth",
+    "BasicAuthConfig",
+    "BearerTokenAuth",
+    "BearerTokenConfig",
+    "CustomAuth",
+    "CustomAuthConfig",
+    "AuthManager",
+
+    # Configuration management
+    "ConfigManager",
+    "config_manager",
+    "GlobalConfig",
+    "LoggingConfig",
+    "SecurityConfig",
+    "PerformanceConfig",
+    "FeatureFlags",
+    "EnvironmentConfig",
+    "ConfigLoader",
+    "ConfigValidator",
+
+    # Enhanced logging
+    "LoggingManager",
+    "setup_logging",
+    "StructuredFormatter",
+    "ColoredFormatter",
+    "CompactFormatter",
+    "AsyncFileHandler",
+    "RotatingAsyncFileHandler",
+    "MetricsHandler",
+    "SensitiveDataFilter",
+    "RateLimitFilter",
+    "ComponentFilter",
+
+    # Enhanced batch operations
+    "BatchManager",
+    "BatchRequest",
+    "BatchResult",
+    "BatchConfig",
+    "BatchPriority",
+    "BatchStatus",
+    "BatchMetrics",
+    "BatchScheduler",
+    "BatchProcessor",
+    "PriorityQueue",
+
+    # Enhanced HTTP support
+    "HTTPMethodHandler",
+    "HTTPMethod",
+    "FileUploadHandler",
+    "MultipartUploadHandler",
+    "DownloadHandler",
+    "ResumableDownloadHandler",
+    "PaginationHandler",
+    "PaginationStrategy",
+    "HeaderManager",
+    "HeaderPresets",
+    "CookieManager",
+    "CookieJar",
 
     # Resource metadata classes
     "PDFMetadata",

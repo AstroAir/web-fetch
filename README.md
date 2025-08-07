@@ -1,8 +1,36 @@
-# Web Fetch - Modern Async Web Scraping Utility
+# WebFetch - Comprehensive Web Content Fetching Library
 
-A robust, production-ready web fetching tool built with modern Python 3.11+ features and AIOHTTP for efficient asynchronous HTTP handling.
+A powerful, production-ready web fetching library with advanced features including authentication, caching, batch operations, file handling, and extensive HTTP support. Built with modern Python 3.11+ features and AIOHTTP for efficient asynchronous operations.
 
 ## 🚀 Features
+
+### 🆕 Enhanced Features (Latest Updates)
+
+#### Advanced Batch Operations
+- **Priority Queue System**: Intelligent batch scheduling with priority levels (LOW, NORMAL, HIGH, URGENT)
+- **Resource Management**: Configurable concurrency limits and memory management
+- **Progress Tracking**: Real-time progress monitoring with callbacks and metrics
+- **Dependency Management**: Batch dependencies and conditional execution
+- **Persistent Results**: Optional result persistence with comprehensive metrics
+
+#### Enhanced HTTP Support
+- **Complete HTTP Methods**: Support for all HTTP methods including PATCH and TRACE
+- **File Upload/Download**: Multipart uploads, resumable downloads with integrity verification
+- **Advanced Pagination**: Automatic handling of offset/limit, page/size, cursor, and link header pagination
+- **Header Management**: Intelligent header management with presets and domain-specific rules
+- **Cookie Management**: Persistent cookie storage with security features and domain management
+
+#### Configuration & Logging
+- **Centralized Configuration**: Comprehensive configuration management with validation and environment support
+- **Enhanced Logging**: Structured logging with async file handlers, rotation, and filtering
+- **Security Features**: Sensitive data masking, rate limiting, and component-specific filtering
+- **Environment Management**: Multi-environment configuration with inheritance and validation
+
+#### MCP Integration
+- **Enhanced MCP Server**: Comprehensive Model Context Protocol server with all new features
+- **Advanced Tools**: Batch processing, file operations, pagination, and configuration management
+- **Progress Reporting**: Real-time progress updates for long-running operations
+- **Error Handling**: Sophisticated error categorization and recovery mechanisms
 
 ### Modern Python Capabilities
 - **Async/await syntax** for concurrent request handling

@@ -1,68 +1,48 @@
 """
-Enhanced caching utilities with multiple backend support.
+Cache utility module for the web_fetch library.
 
-This module provides comprehensive caching functionality including:
-- Memory-based LRU cache
-- File-based persistent cache  
-- Redis distributed cache
-- Automatic cleanup and expiration
+This module provides caching functionality for HTTP responses with TTL and LRU eviction.
+Includes both simple in-memory caching and enhanced caching with multiple backends.
 """
 
-import hashlib
-import gzip
-import time
+from __future__ import annotations
+
 import asyncio
+import gzip
+import hashlib
+import json
 import logging
+import os
+import pickle
+import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+try:
+    import redis.asyncio as redis
+    HAS_REDIS = True
+except ImportError:
+    HAS_REDIS = False
 
-from ..models import CacheConfig
+from ..models import CacheConfig, CacheEntry
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class CacheEntry:
-    """Cache entry with metadata and compression support."""
-    
-    url: str
-    response_data: Any
-    headers: Dict[str, str]
-    status_code: int
-    timestamp: datetime
-    ttl: timedelta
-    compressed: bool = False
-    
-    @property
-    def is_expired(self) -> bool:
-        """Check if cache entry has expired."""
-        return datetime.now() > self.timestamp + self.ttl
-    
-    def get_data(self) -> Any:
-        """Get response data, decompressing if needed."""
-        if self.compressed and isinstance(self.response_data, bytes):
-            try:
-                return gzip.decompress(self.response_data)
-            except Exception:
-                return self.response_data
-        return self.response_data
-
-
 class SimpleCache:
     """
-    Simple in-memory cache with LRU eviction and TTL support.
-    
-    This cache provides basic caching functionality with configurable
-    size limits, TTL, and optional compression. Suitable for development
-    and single-process applications.
+    Simple in-memory cache for HTTP responses.
+
+    Implements an LRU (Least Recently Used) cache with TTL (Time To Live)
+    expiration for HTTP responses. Supports optional compression and
+    automatic cleanup of expired entries.
     """
-    
+
     def __init__(self, config: CacheConfig):
         """
         Initialize cache with configuration.
@@ -353,6 +333,31 @@ class MemoryCacheBackend(CacheBackendInterface):
             del self.cache[key]
 
 
+class EnhancedCache:
+    """Enhanced cache with multiple backends and intelligent features."""
+
+    def __init__(self, config: Optional[EnhancedCacheConfig] = None):
+        """
+        Initialize enhanced cache.
+
+        Args:
+            config: Cache configuration
+        """
+        self.config = config or EnhancedCacheConfig()
+        self.backend = self._create_backend()
+        self.stats = {
+            'hits': 0,
+            'misses': 0,
+            'sets': 0,
+            'deletes': 0,
+            'evictions': 0,
+        }
+
+        # Start cleanup task
+        self._cleanup_task = None
+        if self.config.cleanup_interval > 0:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
 class FileCacheBackend(CacheBackendInterface):
     """File-based cache backend with persistent storage."""
 
@@ -566,31 +571,6 @@ class RedisCacheBackend(CacheBackendInterface):
             await self._redis.close()
 
 
-class EnhancedCache:
-    """Enhanced cache with multiple backends and intelligent features."""
-
-    def __init__(self, config: Optional[EnhancedCacheConfig] = None):
-        """
-        Initialize enhanced cache.
-
-        Args:
-            config: Cache configuration
-        """
-        self.config = config or EnhancedCacheConfig()
-        self.backend = self._create_backend()
-        self.stats = {
-            'hits': 0,
-            'misses': 0,
-            'sets': 0,
-            'deletes': 0,
-            'evictions': 0,
-        }
-
-        # Start cleanup task
-        self._cleanup_task = None
-        if self.config.cleanup_interval > 0:
-            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-
     def _create_backend(self) -> CacheBackendInterface:
         """Create appropriate cache backend."""
         if self.config.backend == CacheBackend.MEMORY:
@@ -667,6 +647,3 @@ class EnhancedCache:
                 await self._cleanup_task
             except asyncio.CancelledError:
                 pass
-
-        if hasattr(self.backend, 'close'):
-            await self.backend.close()
