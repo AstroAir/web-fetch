@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from .client import WebSocketClient
-from .models import WebSocketConfig, WebSocketConnectionState, WebSocketResult
+from .models import WebSocketConfig, WebSocketConnectionState, WebSocketResult, WebSocketMessage
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,7 @@ class WebSocketManager:
 
         return results
 
-    async def receive_all_messages(self):
+    async def receive_all_messages(self) -> AsyncIterator[Tuple[str, WebSocketMessage]]:
         """
         Async iterator for receiving messages from all connections.
 
@@ -256,7 +256,7 @@ class WebSocketManager:
                 # Process completed tasks
                 for task in done:
                     # Find which connection this task belongs to
-                    connection_id = None
+                    connection_id: Optional[str] = None
                     for cid, t in receive_tasks.items():
                         if t == task:
                             connection_id = cid
@@ -274,7 +274,7 @@ class WebSocketManager:
                         del receive_tasks[connection_id]
 
                         client = self._connections.get(connection_id)
-                        if client and client.is_connected:
+                        if client is not None and client.is_connected:
                             new_task = asyncio.create_task(
                                 client.receive_message(timeout=1.0)
                             )

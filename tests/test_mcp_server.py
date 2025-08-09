@@ -73,10 +73,10 @@ class TestMCPServerTools:
             mock_manager_instance.send_text.return_value = True
             mock_manager.return_value = mock_manager_instance
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = await mcp_server.get_tools()
             websocket_send = tools["websocket_send"]
 
-            result = await websocket_send.func(
+            result = await websocket_send.fn(
                 connection_id="test-connection",
                 message="Hello WebSocket",
                 message_type="text",
@@ -106,7 +106,7 @@ class TestMCPServerTools:
             with patch('mcp_server.server.GraphQLClient') as mock_gql_client:
                 mock_gql_client.return_value = mock_client
 
-                tools = {tool.name: tool for tool in mcp_server.get_tools()}
+                tools = await mcp_server.get_tools()
                 graphql_query = tools["graphql_query"]
 
                 result = await graphql_query.func(
@@ -129,7 +129,7 @@ class TestMCPServerTools:
             mock_auth_manager_instance.set_default_method = AsyncMock()
             mock_auth_manager.return_value = mock_auth_manager_instance
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             auth_configure = tools["auth_configure"]
 
             result = await auth_configure.func(
@@ -163,7 +163,7 @@ class TestMCPServerTools:
             mock_parser.parse_content.return_value = ("parsed content", mock_result)
             mock_parser_class.return_value = mock_parser
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             content_parse = tools["content_parse"]
 
             result = await content_parse.func(
@@ -189,7 +189,7 @@ class TestMCPServerTools:
             }
             mock_get_metrics.return_value = mock_metrics
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             metrics_summary = tools["metrics_summary"]
 
             result = await metrics_summary.func(ctx=mock_context)
@@ -213,7 +213,7 @@ class TestMCPServerTools:
             
             mock_ftp_list.return_value = [mock_file_info]
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             ftp_list = tools["ftp_list_directory"]
 
             result = await ftp_list.func(
@@ -245,7 +245,7 @@ class TestMCPServerTools:
             
             mock_crawler_fetch.return_value = mock_result
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             crawler_scrape = tools["crawler_scrape"]
 
             result = await crawler_scrape.func(
@@ -277,7 +277,7 @@ class TestMCPServerTools:
             
             mock_crawler_search.return_value = mock_result
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             crawler_search = tools["crawler_search"]
 
             result = await crawler_search.func(
@@ -297,7 +297,7 @@ class TestMCPServerTools:
     @pytest.mark.asyncio
     async def test_websocket_connect_invalid_url(self, mcp_server, mock_context):
         """Test WebSocket connection with invalid URL."""
-        tools = {tool.name: tool for tool in mcp_server.get_tools()}
+        tools = {tool.name: tool for tool in await mcp_server.get_tools()}
         websocket_connect = tools["websocket_connect"]
 
         result = await websocket_connect.func(
@@ -313,7 +313,7 @@ class TestMCPServerTools:
     @pytest.mark.asyncio
     async def test_graphql_query_invalid_endpoint(self, mcp_server, mock_context):
         """Test GraphQL query with invalid endpoint."""
-        tools = {tool.name: tool for tool in mcp_server.get_tools()}
+        tools = {tool.name: tool for tool in await mcp_server.get_tools()}
         graphql_query = tools["graphql_query"]
 
         result = await graphql_query.func(
@@ -337,7 +337,7 @@ class TestMCPServerIntegration:
     @pytest.mark.asyncio
     async def test_tool_registration(self, mcp_server):
         """Test that all expected tools are registered."""
-        tool_names = {tool.name for tool in mcp_server.get_tools()}
+        tool_names = {tool.name for tool in await mcp_server.get_tools()}
 
         expected_tools = {
             # WebSocket tools
@@ -366,7 +366,7 @@ class TestMCPServerIntegration:
     @pytest.mark.asyncio
     async def test_tool_schemas(self, mcp_server):
         """Test that all tools have proper schemas."""
-        for tool in mcp_server.get_tools():
+        for tool in await mcp_server.get_tools():
             # Check that tool has required attributes
             assert hasattr(tool, 'name')
             assert hasattr(tool, 'description')
@@ -382,7 +382,7 @@ class TestMCPServerIntegration:
         with patch('mcp_server.server.get_metrics_summary') as mock_metrics:
             mock_metrics.return_value = {"test": "data"}
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             metrics_tool = tools["metrics_summary"]
 
             # Execute multiple tools concurrently
@@ -404,7 +404,7 @@ class TestMCPServerIntegration:
         with patch('mcp_server.server.get_metrics_summary') as mock_metrics:
             mock_metrics.side_effect = Exception("Test error")
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             metrics_tool = tools["metrics_summary"]
 
             result = await metrics_tool.func()
@@ -429,7 +429,7 @@ class TestMCPServerPerformance:
         with patch('mcp_server.server.get_metrics_summary') as mock_metrics:
             mock_metrics.return_value = {"test": "data"}
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             metrics_tool = tools["metrics_summary"]
 
             start_time = time.time()
@@ -449,7 +449,7 @@ class TestMCPServerPerformance:
         with patch('mcp_server.server.get_metrics_summary') as mock_metrics:
             mock_metrics.return_value = {"test": "data"}
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             metrics_tool = tools["metrics_summary"]
 
             # Get initial memory usage
@@ -480,7 +480,7 @@ class TestMCPServerSecurity:
     @pytest.mark.asyncio
     async def test_input_validation(self, mcp_server):
         """Test input validation for security."""
-        tools = {tool.name: tool for tool in mcp_server.get_tools()}
+        tools = {tool.name: tool for tool in await mcp_server.get_tools()}
 
         # Test WebSocket connect with malicious URL
         websocket_connect = tools["websocket_connect"]
@@ -506,7 +506,7 @@ class TestMCPServerSecurity:
             mock_auth_manager_instance.add_auth_method = AsyncMock()
             mock_auth_manager.return_value = mock_auth_manager_instance
 
-            tools = {tool.name: tool for tool in mcp_server.get_tools()}
+            tools = {tool.name: tool for tool in await mcp_server.get_tools()}
             auth_configure = tools["auth_configure"]
 
             result = await auth_configure.func(

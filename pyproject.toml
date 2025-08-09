@@ -46,9 +46,9 @@ dependencies = [
     "firecrawl-py>=2.16.3",
     # WebSocket support
     "websockets>=12.0",
-    # GraphQL support
-    "gql>=3.4.0",
-    "aiohttp-graphql>=1.2.0",
+    # GraphQL support (optional)
+    # "gql>=3.4.0",
+    # "aiohttp-graphql>=1.1.0",
     # Enhanced authentication
     "authlib>=1.2.0",
     "python-jose[cryptography]>=3.3.0",
@@ -56,6 +56,13 @@ dependencies = [
     "jsonpath-ng>=1.6.0", # JSON path extraction
     "python-multipart>=0.0.6", # File upload support
     "aioredis>=2.0.0", # Redis caching (optional)
+    # Extended resource type dependencies
+    "asyncpg>=0.30.0", # PostgreSQL async driver
+    "aiomysql>=0.2.0", # MySQL async driver
+    "motor>=3.7.0", # MongoDB async driver
+    "boto3>=1.40.0", # AWS SDK
+    "google-cloud-storage>=3.2.0", # Google Cloud Storage
+    "azure-storage-blob>=12.26.0", # Azure Blob Storage
 ]
 
 [project.optional-dependencies]

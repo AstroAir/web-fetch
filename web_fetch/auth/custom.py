@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthMethod, AuthResult, AuthType
@@ -31,10 +31,7 @@ class CustomAuthConfig(AuthConfig):
         default_factory=dict, description="Custom authentication parameters"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class CustomAuth(AuthMethod):

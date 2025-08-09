@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlencode
 
 import aiohttp
-from pydantic import Field, HttpUrl
+from pydantic import Field, HttpUrl, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthMethod, AuthResult, AuthType
@@ -97,10 +97,7 @@ class OAuth2Config(AuthConfig):
         default=300.0, description="Refresh token when expires within this many seconds"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class OAuth2Auth(AuthMethod):

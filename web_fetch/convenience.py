@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
-from pydantic import HttpUrl
+from pydantic import HttpUrl, AnyUrl
 
 from web_fetch.models import (
     BatchFetchRequest,
@@ -26,6 +26,12 @@ from web_fetch.models import (
 )
 from web_fetch.core_fetcher import WebFetcher
 from web_fetch.streaming_fetcher import StreamingWebFetcher
+from web_fetch.components.manager import ResourceManager
+from web_fetch.models.resource import ResourceConfig, ResourceRequest, ResourceResult, ResourceKind
+from web_fetch.models.extended_resources import (
+    RSSConfig, AuthenticatedAPIConfig, DatabaseConfig, CloudStorageConfig,
+    DatabaseQuery, CloudStorageOperation
+)
 
 
 async def fetch_url(
@@ -306,3 +312,258 @@ async def fetch_with_cache(
             cache.put(url, result.content, result.headers, result.status_code)
 
         return result
+
+
+async def unified_fetch(
+    request: ResourceRequest,
+    config: Optional[ResourceConfig] = None,
+) -> ResourceResult:
+    """
+    Unified convenience to fetch any resource via the component architecture.
+
+    Args:
+        request: ResourceRequest describing the target and kind
+        config: Optional ResourceConfig applied as default for the component
+
+    Returns:
+        ResourceResult with normalized fields across components
+    """
+    manager = ResourceManager(config)
+    return await manager.fetch(request)
+
+
+# Extended resource type convenience functions
+
+async def fetch_rss_feed(
+    feed_url: str,
+    max_items: int = 50,
+    include_content: bool = True,
+    config: Optional[ResourceConfig] = None,
+) -> ResourceResult:
+    """
+    Convenience function to fetch and parse RSS/Atom feeds.
+
+    Args:
+        feed_url: URL of the RSS/Atom feed
+        max_items: Maximum number of feed items to parse
+        include_content: Whether to include full content in items
+        config: Optional ResourceConfig for caching and other settings
+
+    Returns:
+        ResourceResult with parsed feed data and metadata
+
+    Example:
+        ```python
+        result = await fetch_rss_feed("https://example.com/feed.xml", max_items=20)
+        if result.is_success:
+            feed_data = result.content
+            print(f"Feed title: {feed_data['title']}")
+            print(f"Items: {len(feed_data['items'])}")
+        ```
+    """
+    request = ResourceRequest(
+        uri=AnyUrl(feed_url),
+        kind=ResourceKind.RSS,
+        options={
+            "max_items": max_items,
+            "include_content": include_content,
+        }
+    )
+    return await unified_fetch(request, config)
+
+
+async def fetch_authenticated_api(
+    api_url: str,
+    auth_method: str,
+    auth_config: dict,
+    method: str = "GET",
+    headers: Optional[dict] = None,
+    params: Optional[dict] = None,
+    data: Optional[Any] = None,
+    config: Optional[ResourceConfig] = None,
+) -> ResourceResult:
+    """
+    Convenience function to fetch from authenticated API endpoints.
+
+    Args:
+        api_url: URL of the API endpoint
+        auth_method: Authentication method (oauth2, api_key, jwt, basic, bearer)
+        auth_config: Authentication configuration dictionary
+        method: HTTP method (GET, POST, PUT, DELETE, etc.)
+        headers: Optional additional headers
+        params: Optional query parameters
+        data: Optional request body data
+        config: Optional ResourceConfig for caching and other settings
+
+    Returns:
+        ResourceResult with API response data
+
+    Example:
+        ```python
+        # API key authentication
+        result = await fetch_authenticated_api(
+            "https://api.example.com/data",
+            auth_method="api_key",
+            auth_config={
+                "api_key": "your-api-key",
+                "key_name": "X-API-Key",
+                "location": "header"
+            }
+        )
+        ```
+    """
+    request = ResourceRequest(
+        uri=AnyUrl(api_url),
+        kind=ResourceKind.API_AUTH,
+        headers=headers,
+        params=params,
+        options={
+            "method": method,
+            "data": data,
+            "auth_method": auth_method,
+            "auth_config": auth_config,
+        }
+    )
+    return await unified_fetch(request, config)
+
+
+async def execute_database_query(
+    connection_uri: str,
+    query: str,
+    db_config: DatabaseConfig,
+    parameters: Optional[dict] = None,
+    fetch_mode: str = "all",
+    limit: Optional[int] = None,
+    config: Optional[ResourceConfig] = None,
+) -> ResourceResult:
+    """
+    Convenience function to execute database queries.
+
+    Args:
+        connection_uri: Database connection URI (for identification)
+        query: SQL query or MongoDB query (JSON string)
+        db_config: Database configuration with connection details
+        parameters: Optional query parameters
+        fetch_mode: Fetch mode ('all', 'one', 'many')
+        limit: Optional result limit
+        config: Optional ResourceConfig for caching and other settings
+
+    Returns:
+        ResourceResult with query results
+
+    Example:
+        ```python
+        from web_fetch.models.extended_resources import DatabaseConfig, DatabaseType
+
+        db_config = DatabaseConfig(
+            database_type=DatabaseType.POSTGRESQL,
+            host="localhost",
+            port=5432,
+            database="mydb",
+            username="user",
+            password="password"
+        )
+
+        result = await execute_database_query(
+            "postgresql://localhost:5432/mydb",
+            "SELECT * FROM users WHERE active = $1",
+            db_config,
+            parameters={"$1": True},
+            limit=100
+        )
+        ```
+    """
+    query_config = DatabaseQuery(
+        query=query,
+        parameters=parameters,
+        fetch_mode=fetch_mode,
+        limit=limit
+    )
+
+    request = ResourceRequest(
+        uri=AnyUrl(connection_uri),
+        kind=ResourceKind.DATABASE,
+        options={
+            "query": query_config.dict(),
+            "db_config": db_config.dict()
+        }
+    )
+    return await unified_fetch(request, config)
+
+
+async def cloud_storage_operation(
+    storage_uri: str,
+    operation: str,
+    storage_config: CloudStorageConfig,
+    key: Optional[str] = None,
+    prefix: Optional[str] = None,
+    local_path: Optional[str] = None,
+    metadata: Optional[dict] = None,
+    content_type: Optional[str] = None,
+    config: Optional[ResourceConfig] = None,
+) -> ResourceResult:
+    """
+    Convenience function for cloud storage operations.
+
+    Args:
+        storage_uri: Storage URI (for identification)
+        operation: Operation type ('get', 'put', 'list', 'delete', 'copy')
+        storage_config: Cloud storage configuration
+        key: Object key/path for get, put, delete operations
+        prefix: Key prefix for list operations
+        local_path: Local file path for upload/download operations
+        metadata: Optional object metadata for put operations
+        content_type: Content type for upload operations
+        config: Optional ResourceConfig for caching and other settings
+
+    Returns:
+        ResourceResult with operation results
+
+    Example:
+        ```python
+        from web_fetch.models.extended_resources import CloudStorageConfig, CloudStorageProvider
+
+        storage_config = CloudStorageConfig(
+            provider=CloudStorageProvider.AWS_S3,
+            bucket_name="my-bucket",
+            access_key="access-key",
+            secret_key="secret-key",
+            region="us-east-1"
+        )
+
+        # List objects
+        result = await cloud_storage_operation(
+            "s3://my-bucket",
+            "list",
+            storage_config,
+            prefix="documents/"
+        )
+
+        # Download file
+        result = await cloud_storage_operation(
+            "s3://my-bucket",
+            "get",
+            storage_config,
+            key="documents/file.pdf",
+            local_path="./downloads/file.pdf"
+        )
+        ```
+    """
+    operation_config = CloudStorageOperation(
+        operation=operation,
+        key=key,
+        prefix=prefix,
+        local_path=local_path,
+        metadata=metadata or {},
+        content_type=content_type
+    )
+
+    request = ResourceRequest(
+        uri=AnyUrl(storage_uri),
+        kind=ResourceKind.CLOUD_STORAGE,
+        options={
+            "operation": operation_config.dict(),
+            "storage_config": storage_config.dict()
+        }
+    )
+    return await unified_fetch(request, config)

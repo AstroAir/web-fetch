@@ -190,6 +190,7 @@ web-fetch --cache --cache-ttl 300 -t json --format summary https://api.example.c
 ## Crawler APIs
 
 **Note:** Crawler features require API keys. Set environment variables:
+
 ```bash
 export FIRECRAWL_API_KEY="fc-your-api-key"
 export SPIDER_API_KEY="your-spider-api-key"

@@ -23,12 +23,14 @@ This document provides comprehensive information for developers working on the w
 ### Environment Setup
 
 1. **Clone the repository:**
+
 ```bash
 git clone https://github.com/web-fetch/web-fetch.git
 cd web-fetch
 ```
 
 2. **Create and activate virtual environment:**
+
 ```bash
 # Using venv
 python -m venv venv
@@ -40,6 +42,7 @@ conda activate web-fetch
 ```
 
 3. **Install development dependencies:**
+
 ```bash
 # Install in development mode with all dependencies
 pip install -e ".[all,dev,test]"
@@ -49,11 +52,13 @@ pip install -e ".[all,dev,test]"
 ```
 
 4. **Install pre-commit hooks:**
+
 ```bash
 pre-commit install
 ```
 
 5. **Verify installation:**
+
 ```bash
 python -c "import web_fetch; print(web_fetch.__version__)"
 pytest --version
@@ -66,6 +71,7 @@ mypy --version
 #### VS Code Setup
 
 Create `.vscode/settings.json`:
+
 ```json
 {
     "python.defaultInterpreterPath": "./venv/bin/python",
@@ -99,6 +105,7 @@ Create `.vscode/settings.json`:
 ### Environment Variables for Development
 
 Create `.env` file in project root:
+
 ```bash
 # Development settings
 WEB_FETCH_LOG_LEVEL=DEBUG
@@ -575,6 +582,7 @@ type(scope): description
 ```
 
 Types:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -584,6 +592,7 @@ Types:
 - `chore`: Maintenance tasks
 
 Examples:
+
 ```
 feat(http): add circuit breaker pattern support
 
@@ -761,4 +770,5 @@ web-fetch/
 - **CLI Interface**: Command-line tool for common operations
 
 This architecture provides a solid foundation for reliable, high-performance web fetching operations while maintaining clean code organization and extensibility.
+
 ```

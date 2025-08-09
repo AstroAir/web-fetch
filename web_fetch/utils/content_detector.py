@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class ContentTypeDetector:
     """Enhanced content type detector with multiple detection strategies."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize content type detector."""
         # File signatures (magic numbers) for binary detection
         self.file_signatures = {
@@ -379,7 +379,7 @@ class ContentTypeDetector:
         }
 
         # Calculate weighted scores for each content type
-        type_scores = {}
+        type_scores: Dict[ContentType, float] = {}
         for content_type, confidence, method in detections:
             weight = method_weights.get(method, 0.5)
             weighted_score = confidence * weight
@@ -409,7 +409,7 @@ class ContentTypeDetector:
         Returns:
             Dictionary with detection details and confidence scores
         """
-        info = {
+        info: Dict[str, Any] = {
             "detected_type": None,
             "confidence": 0.0,
             "methods": {},

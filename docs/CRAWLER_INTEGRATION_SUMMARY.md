@@ -6,25 +6,29 @@ Successfully integrated multiple web crawling and search APIs into the web-fetch
 
 ## Integrated Crawler APIs
 
-### 1. **Firecrawl API** 
+### 1. **Firecrawl API**
+
 - **Features**: Clean markdown conversion, structured data extraction, JavaScript rendering
 - **SDK**: `firecrawl-py`
 - **Capabilities**: Scrape, Crawl, Search, Extract, Map, JavaScript
 - **Best for**: Clean content extraction and markdown conversion
 
 ### 2. **Spider.cloud API**
+
 - **Features**: High-performance crawling, JavaScript rendering, proxy support, screenshots
 - **SDK**: HTTP API (aiohttp)
 - **Capabilities**: Scrape, Crawl, Search, Screenshot, JavaScript, Proxy
 - **Best for**: Large-scale crawling and JavaScript-heavy sites
 
 ### 3. **Tavily API**
+
 - **Features**: AI-powered search, content extraction, hybrid RAG
 - **SDK**: `tavily-python`
 - **Capabilities**: Search, Extract, Crawl, Map
 - **Best for**: Web search and AI-powered content analysis
 
 ### 4. **AnyCrawl API**
+
 - **Features**: Open-source, LLM-friendly output, multi-threaded
 - **SDK**: HTTP API (aiohttp)
 - **Capabilities**: Scrape, Crawl, Search, Extract
@@ -33,27 +37,32 @@ Successfully integrated multiple web crawling and search APIs into the web-fetch
 ## Key Features Implemented
 
 ### ✅ Unified Interface
+
 - **CrawlerManager**: Coordinates multiple crawler APIs with automatic fallback
 - **Unified Configuration**: Single configuration system for all crawlers
 - **Backward Compatibility**: Existing WebFetcher functionality unchanged
 
 ### ✅ Fallback Mechanisms
+
 - **Primary/Fallback Order**: Configurable crawler preference and fallback sequence
 - **Automatic Retry**: Seamless fallback when primary crawler fails
 - **Error Handling**: Comprehensive error handling with detailed error information
 
 ### ✅ Configuration Management
+
 - **Environment Variables**: API keys and settings via environment variables
 - **Programmatic Config**: Runtime configuration of crawler settings
 - **Status Monitoring**: Real-time status of all crawler APIs
 
 ### ✅ Enhanced Capabilities
+
 - **Web Search**: AI-powered web search with structured results
 - **Website Crawling**: Multi-page crawling with depth and page limits
 - **Content Extraction**: CSS selector and schema-based extraction
 - **JavaScript Rendering**: Support for dynamic content and SPAs
 
 ### ✅ Developer Experience
+
 - **Convenience Functions**: High-level functions for common operations
 - **CLI Integration**: Extended CLI with crawler options
 - **Comprehensive Testing**: Unit tests and integration tests
@@ -96,6 +105,7 @@ asyncio.run(main())
 ## Configuration
 
 ### Environment Variables
+
 ```bash
 export FIRECRAWL_API_KEY="fc-your-api-key"
 export SPIDER_API_KEY="your-spider-api-key"
@@ -104,6 +114,7 @@ export WEB_FETCH_PRIMARY_CRAWLER="firecrawl"
 ```
 
 ### Programmatic Configuration
+
 ```python
 from web_fetch import configure_crawler, CrawlerType
 

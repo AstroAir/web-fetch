@@ -114,6 +114,7 @@ from .fetcher import (
     fetch_url,
     fetch_urls,
     fetch_with_cache,
+    unified_fetch,
     is_valid_url,
     normalize_url,
 )
@@ -152,6 +153,21 @@ from .http import (
     PaginationHandler,
     PaginationStrategy,
     ResumableDownloadHandler,
+)
+
+# Unified component system
+from .components import (
+    ResourceComponent,
+    ComponentFactory,
+    ComponentRegistry,
+    component_registry,
+    ResourceManager,
+)
+from .models.resource import (
+    ResourceKind,
+    ResourceConfig,
+    ResourceRequest,
+    ResourceResult,
 )
 
 # Enhanced logging
@@ -220,11 +236,22 @@ __all__ = [
     "WebFetcher",
     "StreamingWebFetcher",
     "FTPFetcher",
+    # Unified component system
+    "ResourceComponent",
+    "ComponentFactory",
+    "ComponentRegistry",
+    "component_registry",
+    "ResourceManager",
+    "ResourceKind",
+    "ResourceConfig",
+    "ResourceRequest",
+    "ResourceResult",
     # Convenience functions
     "fetch_url",
     "fetch_urls",
     "download_file",
     "fetch_with_cache",
+    "unified_fetch",
     "enhanced_fetch_url",
     "enhanced_fetch_urls",
     "ftp_download_file",

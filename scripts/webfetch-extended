@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""
+Web-Fetch Extended CLI Entry Point
+
+This script provides easy access to the extended web-fetch CLI tools
+for testing configurations, managing credentials, and performing
+operations with extended resource types.
+"""
+
+import sys
+import os
+
+# Add the web_fetch package to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+try:
+    from web_fetch.cli.extended import cli
+    
+    if __name__ == '__main__':
+        cli()
+        
+except ImportError as e:
+    print(f"Error importing web-fetch extended CLI: {e}")
+    print("Make sure web-fetch is properly installed with extended dependencies:")
+    print("  pip install -e .[extended]")
+    sys.exit(1)
+except Exception as e:
+    print(f"Error running web-fetch extended CLI: {e}")
+    sys.exit(1)

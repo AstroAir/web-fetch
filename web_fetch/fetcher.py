@@ -21,6 +21,7 @@ from .convenience import (
     fetch_url,
     fetch_urls,
     fetch_with_cache,
+    unified_fetch,
 )
 
 # Import all components from the modular structure
@@ -160,6 +161,7 @@ __all__ = [
     "fetch_urls",
     "download_file",
     "fetch_with_cache",
+    "unified_fetch",
     # Enhanced convenience functions
     "enhanced_fetch_url",
     "enhanced_fetch_urls",

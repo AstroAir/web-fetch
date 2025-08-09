@@ -10,6 +10,7 @@ import logging
 import time
 from typing import Dict, List, Optional, Union, Any, Literal, Callable
 
+import aiohttp
 from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field, HttpUrl
 from typing_extensions import Annotated
@@ -52,6 +53,7 @@ from web_fetch import (
 # Import advanced utilities
 from web_fetch.utils import (
     CircuitBreakerConfig,
+    EnhancedCache,
     EnhancedCacheConfig,
     CacheBackend,
     TransformationPipeline,

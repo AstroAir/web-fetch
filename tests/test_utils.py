@@ -192,8 +192,8 @@ class TestSimpleCache:
         # Should be available immediately
         assert cache.get("url1") is not None
         
-        # Mock time passage by patching the datetime in the models module
-        with patch('web_fetch.models.http.datetime') as mock_datetime:
+        # Mock time passage by patching the datetime in the cache module
+        with patch('web_fetch.utils.cache.datetime') as mock_datetime:
             # Set current time to 2 seconds later
             future_time = datetime.now() + timedelta(seconds=2)
             mock_datetime.now.return_value = future_time

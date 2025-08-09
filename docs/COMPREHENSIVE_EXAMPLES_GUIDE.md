@@ -5,11 +5,13 @@ This guide provides an overview of all the examples and documentation available 
 ## 📚 Documentation Structure
 
 ### Core Documentation
+
 - **[README.md](../README.md)** - Main project documentation and quick start
 - **[EXAMPLES.md](EXAMPLES.md)** - Basic usage examples and common patterns
 - **[ADVANCED_EXAMPLES.md](ADVANCED_EXAMPLES.md)** - Advanced features and complex scenarios
 
 ### Specialized Guides
+
 - **[CLI_EXAMPLES.md](CLI_EXAMPLES.md)** - Complete command-line interface usage
 - **[PARSER_EXAMPLES.md](PARSER_EXAMPLES.md)** - Content parsing and data extraction
 - **[CONFIGURATION_EXAMPLES.md](CONFIGURATION_EXAMPLES.md)** - Configuration patterns and best practices
@@ -18,9 +20,11 @@ This guide provides an overview of all the examples and documentation available 
 ## 🚀 Getting Started Examples
 
 ### For Beginners
+
 Start with these examples to understand the basics:
 
 1. **[Basic Usage](../examples/basic_usage.py)**
+
    ```python
    from web_fetch import fetch_url, ContentType
    
@@ -30,6 +34,7 @@ Start with these examples to understand the basics:
    ```
 
 2. **[Simple Configuration](../examples/configuration_examples.py)**
+
    ```python
    config = FetchConfig(
        total_timeout=30.0,
@@ -39,6 +44,7 @@ Start with these examples to understand the basics:
    ```
 
 3. **[Basic Error Handling](../examples/error_handling_examples.py)**
+
    ```python
    try:
        result = await fetch_url(url)
@@ -49,6 +55,7 @@ Start with these examples to understand the basics:
    ```
 
 ### For Intermediate Users
+
 Once comfortable with basics, explore these patterns:
 
 1. **[Batch Processing](../examples/advanced_usage.py)**
@@ -67,6 +74,7 @@ Once comfortable with basics, explore these patterns:
    - Configuration validation
 
 ### For Advanced Users
+
 For complex applications and production use:
 
 1. **[Real-World Integration](../examples/real_world_integration_examples.py)**
@@ -90,6 +98,7 @@ For complex applications and production use:
 ## 🎯 Use Case Examples
 
 ### API Integration
+
 **Files:** `real_world_integration_examples.py`, `advanced_usage.py`
 
 ```python
@@ -113,6 +122,7 @@ async def api_integration():
 ```
 
 ### Web Scraping
+
 **Files:** `real_world_integration_examples.py`, `parser_examples.py`
 
 ```python
@@ -129,6 +139,7 @@ class WebScraper:
 ```
 
 ### Data Pipeline
+
 **Files:** `real_world_integration_examples.py`, `performance_optimization_examples.py`
 
 ```python
@@ -148,6 +159,7 @@ class DataPipeline:
 ```
 
 ### Microservices
+
 **Files:** `real_world_integration_examples.py`, `error_handling_examples.py`
 
 ```python
@@ -165,6 +177,7 @@ class ServiceClient:
 ## 🛠️ Feature Examples
 
 ### Command Line Interface
+
 **Files:** `cli_comprehensive_examples.py`, `CLI_EXAMPLES.md`
 
 ```bash
@@ -182,6 +195,7 @@ web-fetch --stream --progress -o file.zip https://example.com/file.zip
 ```
 
 ### Content Parsing
+
 **Files:** `parser_examples.py`, `PARSER_EXAMPLES.md`
 
 ```python
@@ -199,6 +213,7 @@ if html_result.is_success:
 ```
 
 ### Configuration Patterns
+
 **Files:** `configuration_examples.py`, `CONFIGURATION_EXAMPLES.md`
 
 ```python
@@ -215,6 +230,7 @@ if validator.validate_config(config):
 ```
 
 ### Error Handling
+
 **Files:** `error_handling_examples.py`, `ERROR_HANDLING_EXAMPLES.md`
 
 ```python
@@ -235,6 +251,7 @@ except ServerError as e:
 ```
 
 ### Performance Optimization
+
 **Files:** `performance_optimization_examples.py`
 
 ```python
@@ -256,6 +273,7 @@ cache_config = CacheConfig(ttl_seconds=300, max_size=100)
 ## 🧪 Testing Examples
 
 ### Unit Testing
+
 **Files:** `testing_examples.py`
 
 ```python
@@ -266,6 +284,7 @@ async def test_mocked_response(mock_fetch):
 ```
 
 ### Integration Testing
+
 **Files:** `testing_examples.py`
 
 ```python
@@ -276,6 +295,7 @@ async def test_real_api():
 ```
 
 ### Performance Testing
+
 **Files:** `testing_examples.py`, `performance_optimization_examples.py`
 
 ```python
@@ -291,23 +311,27 @@ async def test_concurrent_performance():
 ## 📊 Performance Guidelines
 
 ### Concurrency Recommendations
+
 - **Small APIs**: 3-5 concurrent requests
 - **Large APIs**: 10-20 concurrent requests
 - **Web scraping**: 2-5 concurrent requests (be respectful)
 - **Internal services**: 20-50 concurrent requests
 
 ### Timeout Guidelines
+
 - **Fast APIs**: 5-10 seconds total timeout
 - **Slow APIs**: 30-60 seconds total timeout
 - **File downloads**: 300+ seconds total timeout
 - **Connect timeout**: Usually 5-15 seconds
 
 ### Memory Management
+
 - **Large files**: Use streaming or response size limits
 - **Batch processing**: Process in chunks of 10-50 URLs
 - **Long-running**: Monitor memory usage and implement cleanup
 
 ### Caching Strategy
+
 - **Static content**: Long TTL (hours/days)
 - **Dynamic content**: Short TTL (minutes)
 - **API responses**: Medium TTL (5-30 minutes)
@@ -345,6 +369,7 @@ async def test_concurrent_performance():
 ## 📖 Additional Resources
 
 ### Example Files Quick Reference
+
 - `basic_usage.py` - Simple examples for beginners
 - `advanced_usage.py` - Complex patterns and features
 - `cli_comprehensive_examples.py` - Complete CLI usage
@@ -358,12 +383,14 @@ async def test_concurrent_performance():
 - `crawler_examples.py` - Web crawler integration
 
 ### Documentation Files
+
 - `CLI_EXAMPLES.md` - Command-line usage guide
 - `PARSER_EXAMPLES.md` - Content parsing guide
 - `CONFIGURATION_EXAMPLES.md` - Configuration guide
 - `ERROR_HANDLING_EXAMPLES.md` - Error handling guide
 
 ### Running Examples
+
 ```bash
 # Run individual examples
 python examples/basic_usage.py

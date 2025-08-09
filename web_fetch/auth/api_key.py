@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthLocation, AuthMethod, AuthResult, AuthType
@@ -36,10 +36,7 @@ class APIKeyConfig(AuthConfig):
         default=None, description="Optional prefix for the API key (e.g., 'Bearer')"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class APIKeyAuth(AuthMethod):

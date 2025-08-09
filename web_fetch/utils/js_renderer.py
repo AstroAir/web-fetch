@@ -15,13 +15,18 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 try:
-    from playwright.async_api import Browser, BrowserContext, Page
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright
     from playwright.async_api import TimeoutError as PlaywrightTimeoutError
     from playwright.async_api import async_playwright
 
     HAS_PLAYWRIGHT = True
 except ImportError:
     HAS_PLAYWRIGHT = False
+    # Type stubs for when playwright is not available
+    Browser = None
+    BrowserContext = None
+    Page = None
+    Playwright = None
 
 from ..exceptions import WebFetchError
 
@@ -93,21 +98,21 @@ class JavaScriptRenderer:
             )
 
         self.config = config or JSRenderConfig()
-        self.playwright = None
-        self.browser = None
-        self.context = None
+        self.playwright: Optional[Playwright] = None
+        self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
         self._session_count = 0
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "JavaScriptRenderer":
         """Async context manager entry."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.close()
 
-    async def start(self):
+    async def start(self) -> None:
         """Start the browser session."""
         if self.playwright is None:
             self.playwright = await async_playwright().start()
@@ -142,7 +147,7 @@ class JavaScriptRenderer:
 
             logger.info(f"Started {self.config.browser_type.value} browser session")
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the browser session."""
         if self.context:
             await self.context.close()
@@ -158,7 +163,7 @@ class JavaScriptRenderer:
 
         logger.info("Closed browser session")
 
-    async def render_page(self, url: str, **kwargs) -> Dict[str, Any]:
+    async def render_page(self, url: str, **kwargs: Any) -> Dict[str, Any]:
         """
         Render a JavaScript-heavy page and extract content.
 
@@ -226,7 +231,7 @@ class JavaScriptRenderer:
             if page:
                 await page.close()
 
-    async def _extract_page_data(self, page: Page, response) -> Dict[str, Any]:
+    async def _extract_page_data(self, page: Page, response: Any) -> Dict[str, Any]:
         """Extract data from rendered page."""
         # Get page content
         html_content = await page.content()
@@ -366,7 +371,7 @@ class JavaScriptRenderer:
         }
         return mapping.get(wait_strategy, "networkidle")
 
-    async def _handle_route(self, route):
+    async def _handle_route(self, route: Any) -> None:
         """Handle resource routing for blocking."""
         resource_type = route.request.resource_type
 
@@ -429,7 +434,7 @@ class JavaScriptRenderer:
         """Check if JavaScript rendering is available."""
         return HAS_PLAYWRIGHT
 
-    async def install_browsers(self):
+    async def install_browsers(self) -> None:
         """Install required browser binaries."""
         if not HAS_PLAYWRIGHT:
             raise ImportError("playwright is required for JavaScript rendering")

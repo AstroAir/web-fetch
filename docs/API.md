@@ -25,6 +25,7 @@ This document provides comprehensive API documentation for the web-fetch library
 The main async web fetcher class providing comprehensive HTTP request capabilities with modern Python features, connection pooling, retry logic, and advanced error handling.
 
 **Class Signature:**
+
 ```python
 class WebFetcher:
     def __init__(
@@ -40,6 +41,7 @@ class WebFetcher:
 ```
 
 **Key Features:**
+
 - Async/await support with proper session management
 - Connection pooling and timeout configuration
 - Intelligent retry logic with exponential backoff
@@ -48,6 +50,7 @@ class WebFetcher:
 - Comprehensive error handling and metrics collection
 
 **Basic Usage:**
+
 ```python
 from web_fetch import WebFetcher, FetchConfig, FetchRequest, ContentType
 
@@ -73,6 +76,7 @@ async def basic_example():
 ```
 
 **Advanced Usage with All Features:**
+
 ```python
 from web_fetch import (
     WebFetcher, FetchConfig, CircuitBreakerConfig,
@@ -114,18 +118,22 @@ async def advanced_example():
 Fetch a single URL with comprehensive retry logic and error handling.
 
 **Parameters:**
+
 - `request` (FetchRequest): Request specification containing URL, method, headers, and parsing options
 
 **Returns:**
+
 - `FetchResult`: Response data with status, content, timing, and error information
 
 **Raises:**
+
 - `WebFetchError`: If session is not properly initialized
 - `TimeoutError`: If request exceeds timeout limits
 - `ConnectionError`: If connection cannot be established
 - `HTTPError`: For HTTP-level errors (4xx, 5xx status codes)
 
 **Example:**
+
 ```python
 request = FetchRequest(
     url="https://api.example.com/users/123",
@@ -146,12 +154,15 @@ print(f"Response time: {result.response_time:.2f}s")
 Fetch multiple URLs concurrently with intelligent batching and error handling.
 
 **Parameters:**
+
 - `batch_request` (BatchFetchRequest): Batch specification with multiple requests and options
 
 **Returns:**
+
 - `BatchFetchResult`: Aggregated results with success rate, timing, and individual responses
 
 **Example:**
+
 ```python
 from web_fetch import BatchFetchRequest
 
@@ -177,6 +188,7 @@ print(f"Successful requests: {len(result.successful_results)}")
 Extended WebFetcher class specialized for streaming large files and continuous data with memory-efficient chunked downloading, progress tracking, and resumable transfers.
 
 **Class Signature:**
+
 ```python
 class StreamingWebFetcher(WebFetcher):
     def __init__(self, config: Optional[FetchConfig] = None)
@@ -192,6 +204,7 @@ class StreamingWebFetcher(WebFetcher):
 - File size limits and validation
 
 **Basic Streaming Example:**
+
 ```python
 from web_fetch import StreamingWebFetcher, StreamRequest, ProgressInfo
 from pathlib import Path
@@ -226,13 +239,16 @@ async def stream_example():
 Stream download content with chunked reading and progress tracking.
 
 **Parameters:**
+
 - `request` (StreamRequest): Streaming request specification
 - `progress_callback` (Optional[Callable]): Callback function for progress updates
 
 **Returns:**
+
 - `StreamResult`: Streaming result with download statistics and metadata
 
 **Example:**
+
 ```python
 request = StreamRequest(
     url="https://example.com/dataset.csv",
@@ -272,6 +288,7 @@ async with FTPFetcher(config) as ftp:
 Comprehensive configuration model for HTTP operations with validation and intelligent defaults.
 
 **Class Signature:**
+
 ```python
 class FetchConfig(BaseConfig):
     # Timeout settings
@@ -300,20 +317,24 @@ class FetchConfig(BaseConfig):
 **Field Descriptions:**
 
 **Timeout Settings:**
+
 - `total_timeout` (float): Maximum total time for entire request (default: 30.0s)
 - `connect_timeout` (float): Maximum time for connection establishment (default: 10.0s)
 - `read_timeout` (float): Maximum time for response data reading (default: 20.0s)
 
 **Concurrency Settings:**
+
 - `max_concurrent_requests` (int): Maximum simultaneous requests (default: 10, range: 1-100)
 - `max_connections_per_host` (int): Maximum connections per host (default: 5, range: 1-20)
 
 **Retry Settings:**
+
 - `retry_strategy` (RetryStrategy): Retry delay calculation method (EXPONENTIAL, LINEAR, or NONE)
 - `max_retries` (int): Maximum retry attempts (default: 3, range: 0-10)
 - `retry_delay` (float): Base delay between retries in seconds (default: 1.0s, range: 0.1-60.0s)
 
 **Content and Security:**
+
 - `max_response_size` (int): Maximum response size in bytes (default: 10MB)
 - `follow_redirects` (bool): Whether to follow HTTP redirects (default: True)
 - `verify_ssl` (bool): Whether to verify SSL certificates (default: True)

@@ -9,6 +9,7 @@ organized by protocol and functionality.
 from .base import *
 from .ftp import *
 from .http import *
+from .extended_resources import *
 
 __all__ = [
     # Base models and types
@@ -50,4 +51,14 @@ __all__ = [
     "FTPMode",
     "FTPTransferMode",
     "FTPVerificationMethod",
+    # Extended resource models
+    "FeedFormat",
+    "RSSConfig",
+    "AuthenticatedAPIConfig",
+    "DatabaseType",
+    "DatabaseConfig",
+    "CloudStorageProvider",
+    "CloudStorageConfig",
+    "DatabaseQuery",
+    "CloudStorageOperation",
 ]

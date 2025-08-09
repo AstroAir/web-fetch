@@ -62,6 +62,12 @@ class FeedParser:
                     f"Feed parsing warning for {url}: {parsed_feed.bozo_exception}"
                 )
 
+                # If the feed has no entries and no feed metadata, it's likely completely invalid
+                if (not parsed_feed.entries and
+                    not parsed_feed.feed.get('title') and
+                    not parsed_feed.feed.get('description')):
+                    raise ContentError(f"Invalid feed content: {parsed_feed.bozo_exception}")
+
             # Extract feed metadata
             feed_metadata = self._extract_feed_metadata(parsed_feed, url)
 

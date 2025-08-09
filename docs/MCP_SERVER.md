@@ -7,6 +7,7 @@ The Web-Fetch MCP (Model Context Protocol) Server provides a comprehensive set o
 ## Features
 
 ### Core Web Fetching
+
 - **web_fetch**: Fetch web content with advanced options
 - **web_fetch_batch**: Batch processing of multiple URLs
 - **web_fetch_enhanced**: Enhanced fetching with AI-powered features
@@ -14,6 +15,7 @@ The Web-Fetch MCP (Model Context Protocol) Server provides a comprehensive set o
 - **analyze_headers**: HTTP header analysis
 
 ### WebSocket Support
+
 - **websocket_connect**: Establish WebSocket connections
 - **websocket_send**: Send messages through WebSocket
 - **websocket_receive**: Receive messages from WebSocket
@@ -21,33 +23,40 @@ The Web-Fetch MCP (Model Context Protocol) Server provides a comprehensive set o
 - **websocket_status**: Monitor WebSocket connection status
 
 ### GraphQL Integration
+
 - **graphql_query**: Execute GraphQL queries
 - **graphql_mutation**: Perform GraphQL mutations
 - **graphql_introspect**: Introspect GraphQL schemas
 
 ### Authentication Management
+
 - **auth_configure**: Configure authentication methods
 - **auth_authenticate**: Perform authentication
 - **auth_refresh**: Refresh authentication tokens
 
 ### Content Processing
+
 - **content_parse**: Parse various content types
 - **content_transform**: Transform content using pipelines
 
 ### File Operations
+
 - **upload_file**: Upload files with progress tracking
 - **manage_headers**: Advanced header management
 - **manage_cookies**: Cookie management and persistence
 
 ### FTP Support
+
 - **ftp_list_directory**: List FTP directory contents
 - **ftp_download_file**: Download files from FTP servers
 
 ### Crawler Integration
+
 - **crawler_scrape**: Scrape content using external crawlers
 - **crawler_search**: Search the web using AI-powered crawlers
 
 ### Monitoring & Analytics
+
 - **metrics_summary**: Get system performance metrics
 - **metrics_recent**: Get recent performance data
 - **metrics_record**: Record custom metrics
@@ -323,6 +332,7 @@ python -m mcp_server.server
 ### Tool Categories
 
 #### Web Fetching Tools
+
 - `web_fetch(url, format, headers, timeout, ...)` - Fetch web content
 - `web_fetch_batch(urls, max_concurrent, ...)` - Batch fetch multiple URLs
 - `web_fetch_enhanced(url, extract_content, summarize, ...)` - Enhanced fetching
@@ -330,6 +340,7 @@ python -m mcp_server.server
 - `analyze_headers(headers)` - Analyze HTTP headers
 
 #### WebSocket Tools
+
 - `websocket_connect(url, connection_id, ...)` - Establish WebSocket connection
 - `websocket_send(connection_id, message, message_type)` - Send message
 - `websocket_receive(connection_id, timeout, max_messages)` - Receive messages
@@ -337,33 +348,40 @@ python -m mcp_server.server
 - `websocket_status(connection_id)` - Get connection status
 
 #### GraphQL Tools
+
 - `graphql_query(endpoint, query, variables, ...)` - Execute GraphQL query
 - `graphql_mutation(endpoint, mutation, variables, ...)` - Execute mutation
 - `graphql_introspect(endpoint, ...)` - Introspect schema
 
 #### Authentication Tools
+
 - `auth_configure(auth_type, auth_name, config, ...)` - Configure auth method
 - `auth_authenticate(auth_name, ...)` - Perform authentication
 - `auth_refresh(auth_name)` - Refresh authentication tokens
 
 #### Content Processing Tools
+
 - `content_parse(content, content_type, ...)` - Parse various content types
 - `content_transform(content, transformations)` - Transform content
 
 #### File Operation Tools
+
 - `upload_file(url, file_path, ...)` - Upload files with progress
 - `manage_headers(action, ...)` - Advanced header management
 - `manage_cookies(action, ...)` - Cookie management
 
 #### FTP Tools
+
 - `ftp_list_directory(url, username, password, ...)` - List FTP directory
 - `ftp_download_file(url, local_path, ...)` - Download FTP file
 
 #### Crawler Tools
+
 - `crawler_scrape(url, crawler_type, ...)` - Scrape with external crawlers
 - `crawler_search(query, max_results, ...)` - AI-powered web search
 
 #### Monitoring Tools
+
 - `metrics_summary()` - Get system performance metrics
 - `metrics_recent(minutes)` - Get recent performance data
 - `metrics_record(url, method, status_code, ...)` - Record custom metrics

@@ -73,7 +73,7 @@ class ConfigValidator:
                 if log_path.exists() and not log_path.is_file():
                     self.errors.append(f"Log path exists but is not a file: {log_path}")
                 elif not log_path.parent.exists():
-                    self.warnings.append(
+                    self.errors.append(
                         f"Log directory does not exist: {log_path.parent}"
                     )
             except Exception as e:
@@ -150,6 +150,9 @@ class ConfigValidator:
 
         if performance_config.max_connections_per_host <= 0:
             self.errors.append("Max connections per host must be positive")
+
+        if performance_config.max_concurrent_requests <= 0:
+            self.errors.append("Max concurrent requests must be positive")
 
         if (
             performance_config.max_connections_per_host

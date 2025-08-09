@@ -35,8 +35,24 @@ class FTPConnectionPool:
 
     def _start_cleanup_task(self) -> None:
         """Start the background cleanup task."""
-        if self._cleanup_task is None or self._cleanup_task.done():
-            self._cleanup_task = asyncio.create_task(self._cleanup_connections())
+        try:
+            # Only start the task if there's a running event loop
+            asyncio.get_running_loop()
+            if self._cleanup_task is None or self._cleanup_task.done():
+                self._cleanup_task = asyncio.create_task(self._cleanup_connections())
+        except RuntimeError:
+            # No event loop running, defer task creation
+            pass
+
+    def _ensure_cleanup_task(self) -> None:
+        """Ensure the cleanup task is running if there's an event loop."""
+        try:
+            asyncio.get_running_loop()
+            if self._cleanup_task is None or self._cleanup_task.done():
+                self._cleanup_task = asyncio.create_task(self._cleanup_connections())
+        except RuntimeError:
+            # No event loop running, skip task creation
+            pass
 
     async def _cleanup_connections(self) -> None:
         """Background task to clean up idle connections."""
@@ -87,6 +103,8 @@ class FTPConnectionPool:
         Yields:
             aioftp.Client: FTP client connection
         """
+        # Ensure cleanup task is running now that we have an event loop
+        self._ensure_cleanup_task()
         parsed = urlparse(url)
         host = parsed.hostname or "localhost"
         port = parsed.port or 21

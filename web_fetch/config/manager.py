@@ -129,6 +129,42 @@ class ConfigManager:
 
             return self._config
 
+    def load_from_dict(self, config_dict: Dict[str, Any], validate: bool = True) -> GlobalConfig:
+        """
+        Load configuration from dictionary.
+
+        Args:
+            config_dict: Configuration dictionary
+            validate: Whether to validate configuration
+
+        Returns:
+            Loaded configuration
+        """
+        with self._instance_lock:
+            try:
+                # Use the loader to handle transformations
+                config = self._loader.load_from_dict(config_dict)
+
+                if validate:
+                    is_valid, errors, warnings = self._validator.validate(config)
+
+                    for warning in warnings:
+                        logger.warning(f"Configuration warning: {warning}")
+
+                    if not is_valid:
+                        error_msg = "Configuration validation failed:\n" + "\n".join(errors)
+                        raise ValidationError(error_msg)
+
+                self._config = config
+                self._notify_change_callbacks()
+
+                logger.info("Configuration loaded from dictionary")
+                return config
+
+            except Exception as e:
+                logger.error(f"Failed to load configuration from dictionary: {e}")
+                raise
+
     def update_config(
         self, updates: Dict[str, Any], validate: bool = True, persist: bool = False
     ) -> None:
@@ -151,8 +187,11 @@ class ConfigManager:
             config_dict = self._config.model_dump()
             config_dict = self._deep_update(config_dict, updates)
 
+            # Transform the config dict to handle field name and value transformations
+            transformed_dict = self._loader._transform_config_dict(config_dict)
+
             try:
-                new_config = GlobalConfig(**config_dict)
+                new_config = GlobalConfig(**transformed_dict)
 
                 # Validate if requested
                 if validate:
@@ -232,6 +271,42 @@ class ConfigManager:
 
         # Apply update
         self.update_config(updates, validate, persist)
+
+    def get(self, path: str, default: Any = None) -> Any:
+        """
+        Get a configuration value by path.
+
+        Args:
+            path: Dot-separated path to setting (e.g., 'logging.level')
+            default: Default value if path not found
+
+        Returns:
+            Configuration value or default
+        """
+        config = self.get_config()
+        config_dict = config.model_dump()
+
+        keys = path.split(".")
+        current = config_dict
+
+        try:
+            for key in keys:
+                current = current[key]
+            return current
+        except (KeyError, TypeError):
+            return default
+
+    def set(self, path: str, value: Any, validate: bool = True, persist: bool = False) -> None:
+        """
+        Set a configuration value by path.
+
+        Args:
+            path: Dot-separated path to setting (e.g., 'logging.level')
+            value: New value for setting
+            validate: Whether to validate updated configuration
+            persist: Whether to persist changes to file
+        """
+        self.set_setting(path, value, validate, persist)
 
     def add_change_callback(self, callback: Callable[[Optional[GlobalConfig]], None]) -> None:
         """

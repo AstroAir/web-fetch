@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthMethod, AuthResult, AuthType
@@ -29,10 +29,7 @@ class BasicAuthConfig(AuthConfig):
     username: str = Field(description="Username for basic authentication")
     password: str = Field(description="Password for basic authentication")
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class BasicAuth(AuthMethod):

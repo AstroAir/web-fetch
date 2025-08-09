@@ -4,14 +4,24 @@ This document provides comprehensive examples for advanced features of the web-f
 
 ## Table of Contents
 
-- [FTP Operations](#ftp-operations)
-- [Crawler Integration](#crawler-integration)
-- [Streaming and Large Files](#streaming-and-large-files)
-- [Caching Strategies](#caching-strategies)
-- [Error Handling and Resilience](#error-handling-and-resilience)
-- [Performance Optimization](#performance-optimization)
-- [Content Processing](#content-processing)
-- [Monitoring and Metrics](#monitoring-and-metrics)
+- [Advanced Usage Examples](#advanced-usage-examples)
+  - [Table of Contents](#table-of-contents)
+  - [FTP Operations](#ftp-operations)
+    - [Basic FTP File Operations](#basic-ftp-file-operations)
+    - [Parallel FTP Downloads](#parallel-ftp-downloads)
+    - [FTP with Resumable Downloads](#ftp-with-resumable-downloads)
+  - [Crawler Integration](#crawler-integration)
+    - [Multi-Crawler Web Scraping](#multi-crawler-web-scraping)
+    - [Content Extraction with Crawlers](#content-extraction-with-crawlers)
+  - [Streaming and Large Files](#streaming-and-large-files)
+    - [Progressive Download with Progress Tracking](#progressive-download-with-progress-tracking)
+    - [Memory-Efficient Stream Processing](#memory-efficient-stream-processing)
+  - [Caching Strategies](#caching-strategies)
+    - [Multi-Level Caching](#multi-level-caching)
+    - [Intelligent Cache Warming](#intelligent-cache-warming)
+  - [Error Handling and Resilience](#error-handling-and-resilience)
+    - [Circuit Breaker Pattern](#circuit-breaker-pattern)
+    - [Comprehensive Error Recovery](#comprehensive-error-recovery)
 
 ## FTP Operations
 

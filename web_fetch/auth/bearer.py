@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthMethod, AuthResult, AuthType
@@ -30,10 +30,7 @@ class BearerTokenConfig(AuthConfig):
         default="Authorization", description="Header name for the token"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class BearerTokenAuth(AuthMethod):

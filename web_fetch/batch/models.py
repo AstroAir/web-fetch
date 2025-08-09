@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -55,14 +55,14 @@ class BatchRequest:
     created_at: float = field(default_factory=time.time)
 
     # Callbacks
-    progress_callback: Optional[callable] = None
-    completion_callback: Optional[callable] = None
-    error_callback: Optional[callable] = None
+    progress_callback: Optional[Callable[..., Any]] = None
+    completion_callback: Optional[Callable[..., Any]] = None
+    error_callback: Optional[Callable[..., Any]] = None
 
     # Dependencies
     depends_on: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Post-initialization processing."""
         if not self.requests:
             raise ValueError("Batch request must contain at least one request")
@@ -155,10 +155,10 @@ class BatchConfig(BaseModel):
 
     # Concurrency settings
     max_concurrent_batches: int = Field(
-        default=5, description="Maximum concurrent batches"
+        default=5, description="Maximum concurrent batches", gt=0
     )
     max_concurrent_requests_per_batch: int = Field(
-        default=10, description="Max concurrent requests per batch"
+        default=10, description="Max concurrent requests per batch", gt=0
     )
 
     # Queue settings
@@ -175,9 +175,9 @@ class BatchConfig(BaseModel):
 
     # Timeout settings
     batch_timeout: float = Field(
-        default=3600.0, description="Maximum batch execution time"
+        default=3600.0, description="Maximum batch execution time", gt=0
     )
-    request_timeout: float = Field(default=30.0, description="Default request timeout")
+    request_timeout: float = Field(default=30.0, description="Default request timeout", gt=0)
 
     # Resource management
     memory_limit_mb: int = Field(default=1024, description="Memory limit in MB")

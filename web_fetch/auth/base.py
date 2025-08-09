@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class AuthType(str, Enum):
@@ -71,10 +71,7 @@ class AuthConfig(BaseModel):
         default=30.0, ge=1.0, description="Authentication timeout in seconds"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class AuthMethod(ABC):

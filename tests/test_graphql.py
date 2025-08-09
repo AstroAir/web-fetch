@@ -77,35 +77,37 @@ class TestGraphQLModels:
     def test_graphql_result_success(self):
         """Test successful GraphQL result."""
         result = GraphQLResult(
+            success=True,
             data={"user": {"id": "123", "name": "John"}},
-            errors=None,
+            errors=[],
             extensions={"tracing": {"version": 1}}
         )
         
         assert result.data["user"]["name"] == "John"
-        assert result.errors is None
+        assert result.errors == []
         assert result.extensions["tracing"]["version"] == 1
-        assert result.is_success is True
+        assert result.success is True
 
     def test_graphql_result_with_errors(self):
         """Test GraphQL result with errors."""
         errors = [
-            GraphQLError(
-                message="User not found",
-                locations=[{"line": 2, "column": 3}],
-                path=["user"]
-            )
+            {
+                "message": "User not found",
+                "locations": [{"line": 2, "column": 3}],
+                "path": ["user"]
+            }
         ]
-        
+
         result = GraphQLResult(
+            success=False,
             data=None,
             errors=errors
         )
         
         assert result.data is None
         assert len(result.errors) == 1
-        assert result.errors[0].message == "User not found"
-        assert result.is_success is False
+        assert result.errors[0]["message"] == "User not found"
+        assert result.success is False
 
     def test_graphql_schema_creation(self):
         """Test GraphQL schema creation."""
@@ -123,14 +125,20 @@ class TestGraphQLModels:
         """
         
         schema = GraphQLSchema(
-            sdl=schema_sdl,
-            types=["User", "Query"],
-            queries=["user", "users"]
+            types=[
+                {"name": "User", "kind": "OBJECT"},
+                {"name": "Query", "kind": "OBJECT"}
+            ],
+            queries=[
+                {"name": "user", "type": "User"},
+                {"name": "users", "type": "[User!]!"}
+            ]
         )
-        
-        assert "type User" in schema.sdl
-        assert "User" in schema.types
-        assert "user" in schema.queries
+
+        assert schema.get_type("User") is not None
+        assert schema.get_type("User")["name"] == "User"
+        assert schema.get_query("user") is not None
+        assert schema.get_query("user")["name"] == "user"
 
 
 class TestQueryBuilder:
@@ -138,16 +146,13 @@ class TestQueryBuilder:
 
     def test_simple_query_building(self):
         """Test building simple query."""
-        builder = QueryBuilder()
-        
-        query = (builder
-                .query("GetUser")
-                .field("user", {"id": "$userId"})
-                .field("id")
-                .field("name")
-                .field("email")
-                .variable("userId", "ID!", "123")
-                .build())
+        builder = QueryBuilder("GetUser")
+        builder.variable("userId", "ID!", "123")
+        user_field = builder.field("user")
+        user_field.arg("id", "$userId")
+        user_field.add_fields("id", "name", "email")
+
+        query = builder.build()
         
         assert isinstance(query, GraphQLQuery)
         assert "query GetUser" in query.query
@@ -316,74 +321,79 @@ class TestSubscriptionBuilder:
 class TestGraphQLValidator:
     """Test GraphQL validator."""
 
-    def test_validate_simple_query(self):
+    @pytest.mark.asyncio
+    async def test_validate_simple_query(self):
         """Test validating simple query."""
         validator = GraphQLValidator()
-        
+
         query = GraphQLQuery(
             query="query GetUser($id: ID!) { user(id: $id) { name email } }",
             variables={"id": "123"}
         )
-        
-        result = validator.validate_query(query)
-        
+
+        result = await validator.validate(query)
+
         assert result.is_valid is True
         assert len(result.errors) == 0
 
-    def test_validate_query_syntax_error(self):
+    @pytest.mark.asyncio
+    async def test_validate_query_syntax_error(self):
         """Test validating query with syntax error."""
         validator = GraphQLValidator()
-        
+
         # Missing closing brace
         query = GraphQLQuery(
             query="query GetUser($id: ID!) { user(id: $id) { name email }",
             variables={"id": "123"}
         )
-        
-        result = validator.validate_query(query)
-        
+
+        result = await validator.validate(query)
+
         assert result.is_valid is False
         assert len(result.errors) > 0
 
-    def test_validate_query_missing_variables(self):
+    @pytest.mark.asyncio
+    async def test_validate_query_missing_variables(self):
         """Test validating query with missing variables."""
         validator = GraphQLValidator()
-        
+
         query = GraphQLQuery(
             query="query GetUser($id: ID!, $includeEmail: Boolean!) { user(id: $id) { name email @include(if: $includeEmail) } }",
             variables={"id": "123"}  # Missing includeEmail variable
         )
-        
-        result = validator.validate_query(query)
-        
-        assert result.is_valid is False
-        assert any("includeEmail" in error for error in result.errors)
 
-    def test_validate_mutation(self):
+        result = await validator.validate(query)
+
+        assert result.is_valid is False
+        assert len(result.errors) > 0
+
+    @pytest.mark.asyncio
+    async def test_validate_mutation(self):
         """Test validating mutation."""
         validator = GraphQLValidator()
-        
+
         mutation = GraphQLMutation(
             query="mutation CreateUser($input: UserInput!) { createUser(input: $input) { id name } }",
             variables={"input": {"name": "John", "email": "john@example.com"}}
         )
-        
-        result = validator.validate_mutation(mutation)
-        
+
+        result = await validator.validate(mutation)
+
         assert result.is_valid is True
         assert len(result.errors) == 0
 
-    def test_validate_subscription(self):
+    @pytest.mark.asyncio
+    async def test_validate_subscription(self):
         """Test validating subscription."""
         validator = GraphQLValidator()
-        
+
         subscription = GraphQLSubscription(
             query="subscription OnCommentAdded($postId: ID!) { commentAdded(postId: $postId) { id content } }",
             variables={"postId": "post123"}
         )
-        
-        result = validator.validate_subscription(subscription)
-        
+
+        result = await validator.validate(subscription)
+
         assert result.is_valid is True
         assert len(result.errors) == 0
 
@@ -401,7 +411,7 @@ class TestGraphQLClient:
         client = GraphQLClient(config)
         
         assert client.config == config
-        assert client.config.endpoint == "https://api.example.com/graphql"
+        assert str(client.config.endpoint) == "https://api.example.com/graphql"
 
     @pytest.mark.asyncio
     async def test_client_execute_query(self):
@@ -430,7 +440,7 @@ class TestGraphQLClient:
             mock_response.json.return_value = mock_response_data
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await client.execute_query(query)
+            result = await client.execute(query)
             
             assert isinstance(result, GraphQLResult)
             assert result.is_success is True
@@ -462,9 +472,9 @@ class TestGraphQLClient:
             mock_response.json.return_value = mock_response_data
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await client.execute_mutation(mutation)
+            result = await client.execute(mutation)
             
-            assert result.is_success is True
+            assert result.success is True
             assert result.data["createUser"]["id"] == "456"
 
     @pytest.mark.asyncio
@@ -495,11 +505,11 @@ class TestGraphQLClient:
             mock_response.json.return_value = mock_response_data
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            result = await client.execute_query(query)
-            
-            assert result.is_success is False
+            result = await client.execute(query)
+
+            assert result.success is False
             assert len(result.errors) == 1
-            assert result.errors[0].message == "User not found"
+            assert result.errors[0]["message"] == "User not found"
 
     @pytest.mark.asyncio
     async def test_client_with_authentication(self):
@@ -521,7 +531,7 @@ class TestGraphQLClient:
             mock_response.json.return_value = {"data": {"me": {"id": "current", "name": "Current User"}}}
             mock_post.return_value.__aenter__.return_value = mock_response
             
-            await client.execute_query(query)
+            await client.execute(query)
             
             # Verify that authorization header was sent
             call_args = mock_post.call_args

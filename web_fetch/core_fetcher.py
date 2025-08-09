@@ -19,7 +19,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -89,7 +89,7 @@ class PriorityRequest:
     timestamp: float
     future: asyncio.Future
 
-    def __lt__(self, other):
+    def __lt__(self, other: "PriorityRequest") -> bool:
         if self.priority != other.priority:
             return self.priority < other.priority
         return self.timestamp < other.timestamp
@@ -98,7 +98,7 @@ class PriorityRequest:
 class OptimizedTCPConnector(TCPConnector):
     """Enhanced TCP connector with advanced optimizations."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Extract custom parameters
         self._dns_cache_ttl = kwargs.pop("dns_cache_ttl", 300)
         self._enable_keepalive = kwargs.pop("enable_keepalive", True)
@@ -108,7 +108,7 @@ class OptimizedTCPConnector(TCPConnector):
 
         # Enhanced connection tracking
         self._connection_stats = ConnectionPoolStats()
-        self._dns_cache = {}
+        self._dns_cache: Dict[str, Tuple[Any, float]] = {}
         self._last_dns_cleanup = time.time()
 
         # Configure SSL context for better performance
@@ -120,7 +120,7 @@ class OptimizedTCPConnector(TCPConnector):
             ssl_context.options |= ssl.OP_NO_COMPRESSION
             self._ssl_context = ssl_context
 
-    async def _create_connection(self, req, traces, timeout):
+    async def _create_connection(self, req: Any, traces: Any, timeout: Any) -> Any:
         """Override to add connection tracking."""
         self._connection_stats.connection_creation_count += 1
         host = req.host
@@ -130,7 +130,7 @@ class OptimizedTCPConnector(TCPConnector):
 
         return await super()._create_connection(req, traces, timeout)
 
-    def _cleanup_dns_cache(self):
+    def _cleanup_dns_cache(self) -> None:
         """Cleanup expired DNS entries."""
         current_time = time.time()
         if current_time - self._last_dns_cleanup > 60:  # Cleanup every minute
@@ -147,8 +147,8 @@ class OptimizedTCPConnector(TCPConnector):
 class AdaptiveRetryStrategy:
     """Intelligent retry strategy that adapts based on error patterns."""
 
-    def __init__(self):
-        self._host_error_rates = defaultdict(
+    def __init__(self) -> None:
+        self._host_error_rates: Dict[str, Dict[str, Union[int, float]]] = defaultdict(
             lambda: {"errors": 0, "requests": 0, "last_reset": time.time()}
         )
         self._global_backoff_multiplier = 1.0

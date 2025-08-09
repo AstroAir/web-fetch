@@ -12,7 +12,7 @@ import json
 import time
 from typing import Any, Dict, Optional
 
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 from ..exceptions import WebFetchError
 from .base import AuthConfig, AuthMethod, AuthResult, AuthType
@@ -65,10 +65,7 @@ class JWTConfig(AuthConfig):
     verify_signature: bool = Field(default=True, description="Verify JWT signature")
     verify_expiration: bool = Field(default=True, description="Verify JWT expiration")
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class JWTAuth(AuthMethod):

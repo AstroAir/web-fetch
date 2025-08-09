@@ -202,6 +202,91 @@ class ConfigLoader:
 
         return result
 
+    def load_from_dict(self, config_dict: Dict[str, Any]) -> GlobalConfig:
+        """
+        Load configuration from a dictionary.
+
+        Args:
+            config_dict: Configuration dictionary
+
+        Returns:
+            GlobalConfig instance
+        """
+        # Transform the config dict to match the expected structure
+        transformed_dict = self._transform_config_dict(config_dict.copy())
+        return GlobalConfig(**transformed_dict)
+
+    def _transform_config_dict(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform config dict to match expected structure."""
+        # Handle top-level environment and debug fields
+        if "environment" in config_dict and isinstance(config_dict["environment"], str):
+            env_value = config_dict["environment"]
+            debug_value = config_dict.pop("debug", False)
+            config_dict["environment"] = {
+                "environment": env_value,
+                "debug": debug_value
+            }
+        elif "debug" in config_dict:
+            # Move debug to environment section
+            debug_value = config_dict.pop("debug")
+            if "environment" not in config_dict:
+                config_dict["environment"] = {}
+            config_dict["environment"]["debug"] = debug_value
+
+        # Transform logging level to uppercase and field names
+        if "logging" in config_dict:
+            logging_config = config_dict["logging"]
+            if "level" in logging_config:
+                level = logging_config["level"]
+                if isinstance(level, str):
+                    logging_config["level"] = level.upper()
+
+            # Handle field name transformations
+            if "enable_file_logging" in logging_config:
+                logging_config["enable_file"] = logging_config.pop("enable_file_logging")
+            if "log_file" in logging_config:
+                logging_config["file_path"] = logging_config.pop("log_file")
+
+        return config_dict
+
+    def load_from_env(self) -> GlobalConfig:
+        """
+        Load configuration from environment variables only.
+
+        Returns:
+            GlobalConfig instance with environment-based configuration
+        """
+        env_config = self._load_from_environment()
+        if env_config:
+            transformed_config = self._transform_config_dict(env_config)
+            return GlobalConfig(**transformed_config)
+        else:
+            return GlobalConfig()
+
+    def load_from_file(self, config_file: Union[str, Path]) -> GlobalConfig:
+        """
+        Load configuration from a specific file.
+
+        Args:
+            config_file: Path to configuration file
+
+        Returns:
+            GlobalConfig instance
+
+        Raises:
+            ValueError: If file doesn't exist or can't be parsed
+        """
+        config_path = Path(config_file)
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+
+        file_config = self._parse_config_file(config_path)
+        if file_config:
+            transformed_config = self._transform_config_dict(file_config)
+            return GlobalConfig(**transformed_config)
+        else:
+            return GlobalConfig()
+
     def save_config(self, config: GlobalConfig, config_file: Union[str, Path]) -> None:
         """Save configuration to file."""
         config_path = Path(config_file)

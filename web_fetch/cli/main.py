@@ -200,6 +200,14 @@ Examples:
         "-v", "--verbose", action="store_true", help="Enable verbose output"
     )
 
+    # Add subcommands
+    subparsers = parser.add_subparsers(dest="command")
+    try:
+        from .components import add_components_subparser
+        add_components_subparser(subparsers)
+    except Exception:
+        # Keep CLI working even if components module not present
+        pass
     return parser
 
 
@@ -404,6 +412,17 @@ async def main() -> None:
     """Main CLI function."""
     parser = create_parser()
     args = parser.parse_args()
+
+    # Handle components subcommand
+    if getattr(args, "func", None):
+        # Subcommands provide an async command coroutine to run in this loop
+        command = args.func
+        if asyncio.iscoroutinefunction(command):
+            await command(args)
+        else:
+            # Back-compat in case a sync function is provided
+            command(args)
+        return
 
     # Handle crawler status command
     if args.crawler_status:

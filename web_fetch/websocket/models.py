@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 
 from ..exceptions import WebFetchError
 
@@ -53,7 +53,7 @@ class WebSocketMessage:
     timestamp: float = field(default_factory=time.time)
     size: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Calculate message size after initialization."""
         if self.data is not None:
             if isinstance(self.data, str):
@@ -151,7 +151,4 @@ class WebSocketConfig(BaseModel):
         default=True, description="Enable per-message deflate compression"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)

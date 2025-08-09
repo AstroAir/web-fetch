@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class LogLevel(str, Enum):
@@ -214,6 +214,65 @@ class EnvironmentConfig(BaseModel):
         """Ensure paths are Path objects."""
         return Path(v) if not isinstance(v, Path) else v
 
+    @classmethod
+    def for_environment(cls, environment: Environment) -> "GlobalConfig":
+        """
+        Create configuration for specific environment.
+
+        Args:
+            environment: Target environment
+
+        Returns:
+            GlobalConfig configured for the environment
+        """
+        if environment == Environment.DEVELOPMENT:
+            return GlobalConfig(
+                environment=EnvironmentConfig(
+                    environment=environment,
+                    debug=True
+                ),
+                logging=LoggingConfig(level=LogLevel.DEBUG),
+                security=SecurityConfig(verify_ssl=False),
+                performance=PerformanceConfig(max_concurrent_requests=5)
+            )
+        elif environment == Environment.TESTING:
+            return GlobalConfig(
+                environment=EnvironmentConfig(
+                    environment=environment,
+                    debug=True,
+                    testing=True
+                ),
+                logging=LoggingConfig(level=LogLevel.DEBUG),
+                security=SecurityConfig(verify_ssl=False),
+                performance=PerformanceConfig(max_concurrent_requests=3)
+            )
+        elif environment == Environment.PRODUCTION:
+            return GlobalConfig(
+                environment=EnvironmentConfig(
+                    environment=environment,
+                    debug=False
+                ),
+                logging=LoggingConfig(level=LogLevel.WARNING),
+                security=SecurityConfig(verify_ssl=True),
+                performance=PerformanceConfig(max_concurrent_requests=50)
+            )
+        elif environment == Environment.STAGING:
+            return GlobalConfig(
+                environment=EnvironmentConfig(
+                    environment=environment,
+                    debug=False
+                ),
+                logging=LoggingConfig(level=LogLevel.INFO),
+                security=SecurityConfig(verify_ssl=True),
+                performance=PerformanceConfig(max_concurrent_requests=20)
+            )
+        else:
+            return GlobalConfig(
+                environment=EnvironmentConfig(environment=environment)
+            )
+
+
+
 
 class GlobalConfig(BaseModel):
     """Global configuration container."""
@@ -236,9 +295,8 @@ class GlobalConfig(BaseModel):
         default_factory=dict, description="Custom configuration values"
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        validate_assignment = True
-        extra = "forbid"
-        use_enum_values = True
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+        use_enum_values=True
+    )

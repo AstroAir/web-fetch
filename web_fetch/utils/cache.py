@@ -48,7 +48,12 @@ class CacheEntry:
         """Get response data, decompressing if needed."""
         if self.compressed and isinstance(self.response_data, bytes):
             try:
-                return gzip.decompress(self.response_data)
+                decompressed = gzip.decompress(self.response_data)
+                # Try to decode as UTF-8 string if it was originally a string
+                try:
+                    return decompressed.decode('utf-8')
+                except UnicodeDecodeError:
+                    return decompressed
             except Exception:
                 return self.response_data
         return self.response_data
