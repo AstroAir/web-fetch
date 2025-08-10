@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class FeedParser:
     """Parser for RSS/Atom feeds."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize feed parser."""
         if not HAS_FEEDPARSER:
             raise ImportError(
@@ -103,7 +103,7 @@ class FeedParser:
             logger.error(f"Failed to parse feed from {url}: {e}")
             raise ContentError(f"Feed parsing error: {e}")
 
-    def _extract_feed_metadata(self, parsed_feed, url: Optional[str]) -> FeedMetadata:
+    def _extract_feed_metadata(self, parsed_feed: Any, url: Optional[str]) -> FeedMetadata:
         """Extract metadata from parsed feed."""
         metadata = FeedMetadata()
 
@@ -165,7 +165,7 @@ class FeedParser:
 
         return metadata
 
-    def _extract_feed_items(self, parsed_feed, url: Optional[str]) -> List[FeedItem]:
+    def _extract_feed_items(self, parsed_feed: Any, url: Optional[str]) -> List[FeedItem]:
         """Extract items from parsed feed."""
         items = []
 

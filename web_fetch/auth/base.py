@@ -94,7 +94,7 @@ class AuthMethod(ABC):
         self._last_auth_time: Optional[float] = None
 
     @abstractmethod
-    async def authenticate(self, **kwargs) -> AuthResult:
+    async def authenticate(self, **kwargs: Any) -> AuthResult:
         """
         Perform authentication and return credentials.
 
@@ -122,7 +122,7 @@ class AuthMethod(ABC):
         """
         pass
 
-    async def get_auth_data(self, force_refresh: bool = False, **kwargs) -> AuthResult:
+    async def get_auth_data(self, force_refresh: bool = False, **kwargs: Any) -> AuthResult:
         """
         Get authentication data, using cache if available and valid.
 

@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class ImageParser:
     """Parser for extracting metadata from images."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize image parser."""
         if not HAS_PIL:
             raise ImportError(

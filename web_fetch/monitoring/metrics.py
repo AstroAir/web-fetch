@@ -20,6 +20,7 @@ try:
     import prometheus_client
     PROMETHEUS_AVAILABLE = True
 except ImportError:
+    prometheus_client = None
     PROMETHEUS_AVAILABLE = False
 
 try:
@@ -63,11 +64,11 @@ class TimingContext:
     start_time: Optional[float] = None
     metrics_collector: Optional['MetricsCollector'] = None
     
-    def __enter__(self):
+    def __enter__(self) -> 'TimingContext':
         self.start_time = time.time()
         return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
+
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[object]) -> None:
         if self.start_time and self.metrics_collector:
             duration = time.time() - self.start_time
             self.metrics_collector.record_timer(self.name, duration, self.tags)
@@ -77,22 +78,22 @@ class MetricsBackendInterface(ABC):
     """Abstract interface for metrics backends."""
     
     @abstractmethod
-    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None):
+    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
         """Record counter metric."""
         pass
-    
+
     @abstractmethod
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record gauge metric."""
         pass
-    
+
     @abstractmethod
-    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record histogram metric."""
         pass
-    
+
     @abstractmethod
-    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record timer metric."""
         pass
 
@@ -111,7 +112,7 @@ class MemoryMetricsBackend(MetricsBackendInterface):
         self.metrics: Dict[str, Deque[MetricPoint]] = defaultdict(lambda: deque(maxlen=max_points))
         self.lock = Lock()
     
-    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None):
+    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
         """Record counter metric."""
         with self.lock:
             point = MetricPoint(
@@ -122,8 +123,8 @@ class MemoryMetricsBackend(MetricsBackendInterface):
                 metric_type=MetricType.COUNTER
             )
             self.metrics[name].append(point)
-    
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record gauge metric."""
         with self.lock:
             point = MetricPoint(
@@ -135,7 +136,7 @@ class MemoryMetricsBackend(MetricsBackendInterface):
             )
             self.metrics[name].append(point)
     
-    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record histogram metric."""
         with self.lock:
             point = MetricPoint(
@@ -146,8 +147,8 @@ class MemoryMetricsBackend(MetricsBackendInterface):
                 metric_type=MetricType.HISTOGRAM
             )
             self.metrics[name].append(point)
-    
-    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record timer metric."""
         with self.lock:
             point = MetricPoint(
@@ -190,7 +191,7 @@ class MemoryMetricsBackend(MetricsBackendInterface):
 class PrometheusMetricsBackend(MetricsBackendInterface):
     """Prometheus metrics backend."""
     
-    def __init__(self, registry=None):
+    def __init__(self, registry: Optional[object] = None) -> None:
         """
         Initialize Prometheus metrics backend.
         
@@ -201,12 +202,12 @@ class PrometheusMetricsBackend(MetricsBackendInterface):
             raise ImportError("prometheus_client package is required for Prometheus backend")
         
         self.registry = registry or prometheus_client.REGISTRY
-        self.counters: Dict[str, prometheus_client.Counter] = {}
-        self.gauges: Dict[str, prometheus_client.Gauge] = {}
-        self.histograms: Dict[str, prometheus_client.Histogram] = {}
+        self.counters: Dict[str, Any] = {}
+        self.gauges: Dict[str, Any] = {}
+        self.histograms: Dict[str, Any] = {}
         self.lock = Lock()
     
-    def _get_or_create_counter(self, name: str, tags: Dict[str, str]) -> prometheus_client.Counter:
+    def _get_or_create_counter(self, name: str, tags: Dict[str, str]) -> Any:
         """Get or create Prometheus counter."""
         key = f"{name}_{hash(frozenset(tags.keys()))}"
         
@@ -222,7 +223,7 @@ class PrometheusMetricsBackend(MetricsBackendInterface):
         
         return self.counters[key]
     
-    def _get_or_create_gauge(self, name: str, tags: Dict[str, str]) -> prometheus_client.Gauge:
+    def _get_or_create_gauge(self, name: str, tags: Dict[str, str]) -> Any:
         """Get or create Prometheus gauge."""
         key = f"{name}_{hash(frozenset(tags.keys()))}"
         
@@ -238,7 +239,7 @@ class PrometheusMetricsBackend(MetricsBackendInterface):
         
         return self.gauges[key]
     
-    def _get_or_create_histogram(self, name: str, tags: Dict[str, str]) -> prometheus_client.Histogram:
+    def _get_or_create_histogram(self, name: str, tags: Dict[str, str]) -> Any:
         """Get or create Prometheus histogram."""
         key = f"{name}_{hash(frozenset(tags.keys()))}"
         
@@ -254,25 +255,25 @@ class PrometheusMetricsBackend(MetricsBackendInterface):
         
         return self.histograms[key]
     
-    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None):
+    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
         """Record counter metric."""
         tags = tags or {}
         counter = self._get_or_create_counter(name, tags)
         counter.labels(**tags).inc(value)
-    
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record gauge metric."""
         tags = tags or {}
         gauge = self._get_or_create_gauge(name, tags)
         gauge.labels(**tags).set(value)
-    
-    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record histogram metric."""
         tags = tags or {}
         histogram = self._get_or_create_histogram(name, tags)
         histogram.labels(**tags).observe(value)
-    
-    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record timer metric."""
         # Use histogram for timing data
         self.record_histogram(f"{name}_duration_seconds", value, tags)
@@ -290,22 +291,22 @@ class ConsoleMetricsBackend(MetricsBackendInterface):
         """
         self.print_func = print_func
     
-    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None):
+    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
         """Record counter metric."""
         tags_str = f" {tags}" if tags else ""
         self.print_func(f"COUNTER {name}: {value}{tags_str}")
-    
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record gauge metric."""
         tags_str = f" {tags}" if tags else ""
         self.print_func(f"GAUGE {name}: {value}{tags_str}")
-    
-    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record histogram metric."""
         tags_str = f" {tags}" if tags else ""
         self.print_func(f"HISTOGRAM {name}: {value}{tags_str}")
-    
-    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record timer metric."""
         tags_str = f" {tags}" if tags else ""
         self.print_func(f"TIMER {name}: {value:.3f}s{tags_str}")
@@ -331,19 +332,19 @@ class MetricsCollector:
         self.cache_hits = 0
         self.cache_misses = 0
     
-    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None):
+    def record_counter(self, name: str, value: float = 1.0, tags: Optional[Dict[str, str]] = None) -> None:
         """Record counter metric across all backends."""
         if not self.enabled:
             return
-        
+
         for backend in self.backends:
             try:
                 backend.record_counter(name, value, tags)
             except Exception as e:
                 # Don't let metrics failures break the application
                 print(f"Metrics backend error: {e}")
-    
-    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_gauge(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record gauge metric across all backends."""
         if not self.enabled:
             return
@@ -354,18 +355,18 @@ class MetricsCollector:
             except Exception as e:
                 print(f"Metrics backend error: {e}")
     
-    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+    def record_histogram(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record histogram metric across all backends."""
         if not self.enabled:
             return
-        
+
         for backend in self.backends:
             try:
                 backend.record_histogram(name, value, tags)
             except Exception as e:
                 print(f"Metrics backend error: {e}")
-    
-    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None):
+
+    def record_timer(self, name: str, value: float, tags: Optional[Dict[str, str]] = None) -> None:
         """Record timer metric across all backends."""
         if not self.enabled:
             return
@@ -381,7 +382,7 @@ class MetricsCollector:
         return TimingContext(name, tags or {}, metrics_collector=self)
     
     def record_request(self, resource_kind: str, success: bool, duration: float,
-                      cache_hit: bool = False, tags: Optional[Dict[str, str]] = None):
+                      cache_hit: bool = False, tags: Optional[Dict[str, str]] = None) -> None:
         """Record resource request metrics."""
         base_tags = {"resource_kind": resource_kind, "success": str(success)}
         if tags:
@@ -408,7 +409,7 @@ class MetricsCollector:
         if not success:
             self.record_counter("webfetch.errors.total", 1.0, base_tags)
     
-    def record_component_metrics(self, component_name: str, metrics: Dict[str, Any]):
+    def record_component_metrics(self, component_name: str, metrics: Dict[str, Any]) -> None:
         """Record component-specific metrics."""
         base_tags = {"component": component_name}
         
@@ -438,11 +439,11 @@ class MetricsCollector:
         
         return summary
     
-    def enable(self):
+    def enable(self) -> None:
         """Enable metrics collection."""
         self.enabled = True
-    
-    def disable(self):
+
+    def disable(self) -> None:
         """Disable metrics collection."""
         self.enabled = False
 
@@ -461,13 +462,13 @@ def get_metrics_collector() -> MetricsCollector:
     return _global_metrics_collector
 
 
-def configure_metrics(backends: List[MetricsBackendInterface]):
+def configure_metrics(backends: List[MetricsBackendInterface]) -> None:
     """Configure global metrics collector with specific backends."""
     global _global_metrics_collector
     _global_metrics_collector = MetricsCollector(backends)
 
 
-def create_metrics_backend(backend_type: MetricBackend, **kwargs) -> MetricsBackendInterface:
+def create_metrics_backend(backend_type: MetricBackend, **kwargs: Any) -> MetricsBackendInterface:
     """
     Create metrics backend of specified type.
     

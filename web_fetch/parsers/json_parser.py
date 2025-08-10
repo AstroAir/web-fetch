@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class JSONParser:
     """Enhanced JSON parser with API standard support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize JSON parser."""
         self.api_standards = {
             "json-ld": self._parse_json_ld,

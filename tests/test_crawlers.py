@@ -57,7 +57,7 @@ class TestCrawlerBase:
             max_results=10
         )
         
-        assert str(request.url) == "https://example.com"
+        assert str(request.url) == "https://example.com/"
         assert request.operation == CrawlerCapability.SCRAPE
         assert request.query == "test query"
         assert request.max_results == 10
@@ -293,9 +293,9 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_crawler_fetch_url_fallback_to_http(self):
         """Test crawler_fetch_url falling back to HTTP."""
-        with patch('web_fetch.crawlers.convenience.fetch_url') as mock_fetch:
+        with patch('web_fetch.convenience.fetch_url') as mock_fetch:
             mock_fetch.return_value = Mock(content="HTTP content")
-            
+
             result = await crawler_fetch_url("https://example.com", use_crawler=False)
             mock_fetch.assert_called_once()
     

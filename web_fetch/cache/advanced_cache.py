@@ -19,6 +19,7 @@ try:
     import redis.asyncio as redis
     REDIS_AVAILABLE = True
 except ImportError:
+    redis = None
     REDIS_AVAILABLE = False
 
 try:
@@ -225,9 +226,9 @@ class RedisCacheBackend(CacheBackendInterface):
         
         self.redis_url = redis_url
         self.key_prefix = key_prefix
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: Optional[Any] = None
     
-    async def _get_client(self) -> redis.Redis:
+    async def _get_client(self) -> Any:
         """Get Redis client, creating if needed."""
         if self.redis_client is None:
             self.redis_client = redis.from_url(self.redis_url)
@@ -471,7 +472,7 @@ class AdvancedCacheManager:
         
         return count
     
-    async def warm_cache(self, key: str, value_factory, ttl: Optional[int] = None,
+    async def warm_cache(self, key: str, value_factory: Any, ttl: Optional[int] = None,
                         tags: Optional[Set[str]] = None) -> None:
         """
         Warm cache with a value factory function.
@@ -563,6 +564,7 @@ def create_cache_manager(backend_type: CacheBackend = CacheBackend.MEMORY,
     Returns:
         Configured cache manager
     """
+    backend: CacheBackendInterface
     if backend_type == CacheBackend.MEMORY:
         backend = MemoryCacheBackend(
             max_size=kwargs.get("max_size", 1000),

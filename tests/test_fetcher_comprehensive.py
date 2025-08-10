@@ -357,11 +357,10 @@ class TestStreamingWebFetcherComprehensive:
     @pytest.mark.asyncio
     async def test_streaming_download_comprehensive(self):
         """Test comprehensive streaming download functionality."""
-        config = StreamingConfig(
-            chunk_size=1024,
-            buffer_size=8192,  # Minimum required value
-            enable_progress=True,
-            progress_interval=0.1  # Use default value
+        config = FetchConfig(
+            total_timeout=30.0,
+            connect_timeout=10.0,
+            read_timeout=20.0
         )
 
         # Create test data
@@ -402,7 +401,11 @@ class TestStreamingWebFetcherComprehensive:
     @pytest.mark.asyncio
     async def test_streaming_with_resume_comprehensive(self):
         """Test comprehensive streaming with resume functionality."""
-        config = StreamingConfig(chunk_size=1024)
+        config = FetchConfig(
+            total_timeout=30.0,
+            connect_timeout=10.0,
+            read_timeout=20.0
+        )
 
         # Create test data
         full_data = b'0123456789' * 1000  # 10KB
@@ -483,10 +486,10 @@ class TestStreamingWebFetcherComprehensive:
     @pytest.mark.asyncio
     async def test_streaming_progress_tracking_comprehensive(self):
         """Test comprehensive progress tracking during streaming."""
-        config = StreamingConfig(
-            chunk_size=1000,
-            enable_progress=True,
-            progress_interval=0.01  # Minimum allowed value
+        config = FetchConfig(
+            total_timeout=30.0,
+            connect_timeout=10.0,
+            read_timeout=20.0
         )
 
         test_data = b'x' * 5000  # 5KB

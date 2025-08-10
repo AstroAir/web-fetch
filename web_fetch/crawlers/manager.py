@@ -178,8 +178,9 @@ class CrawlerManager:
         crawler_order = self._get_crawler_order(request.operation)
 
         if not crawler_order:
+            operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
             raise CrawlerError(
-                f"No available crawler supports {request.operation.value} operation"
+                f"No available crawler supports {operation_str} operation"
             )
 
         last_error: Optional[CrawlerError] = None
@@ -187,15 +188,17 @@ class CrawlerManager:
         # Try each crawler in order
         for crawler_type in crawler_order:
             try:
+                operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
                 logger.info(
-                    f"Attempting {request.operation.value} with {crawler_type.value}"
+                    f"Attempting {operation_str} with {crawler_type.value}"
                 )
                 crawler = self._get_crawler_instance(crawler_type)
                 result = await crawler.execute_request(request)
 
                 if result.is_success:
+                    operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
                     logger.info(
-                        f"Successfully completed {request.operation.value} with {crawler_type.value}"
+                        f"Successfully completed {operation_str} with {crawler_type.value}"
                     )
                     return result
                 else:
@@ -218,7 +221,8 @@ class CrawlerManager:
                 continue
 
         # All crawlers failed
-        error_msg = f"All crawlers failed for {request.operation.value} operation"
+        operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
+        error_msg = f"All crawlers failed for {operation_str} operation"
         if last_error:
             error_msg += f". Last error: {last_error}"
 

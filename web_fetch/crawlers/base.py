@@ -281,8 +281,9 @@ class BaseCrawler(ABC):
     async def execute_request(self, request: CrawlerRequest) -> CrawlerResult:
         """Execute a crawler request based on the operation type."""
         if not self.supports_capability(request.operation):
+            operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
             raise CrawlerError(
-                f"{self.crawler_type.value} does not support {request.operation.value} operation",
+                f"{self.crawler_type.value} does not support {operation_str} operation",
                 crawler_type=self.crawler_type,
             )
 
@@ -296,8 +297,9 @@ class BaseCrawler(ABC):
         elif request.operation == CrawlerCapability.EXTRACT:
             return await self.extract(request)
         else:
+            operation_str = request.operation.value if hasattr(request.operation, 'value') else str(request.operation)
             raise CrawlerError(
-                f"Operation {request.operation.value} not implemented",
+                f"Operation {operation_str} not implemented",
                 crawler_type=self.crawler_type,
             )
 
