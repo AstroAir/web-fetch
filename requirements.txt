@@ -6,6 +6,9 @@ lxml>=4.9.0
 aiofiles>=23.0.0
 aioftp>=0.21.0
 
+# CLI Enhancement
+rich>=13.0.0
+
 # MCP Framework
 fastmcp>=0.2.0
 

@@ -2,8 +2,9 @@
 """
 Command-line interface for the web_fetch library.
 
-This module provides a simple CLI for fetching URLs with various options
-and output formats.
+This module provides a comprehensive CLI for fetching URLs with support for
+different content types, batch processing, streaming, various output formats,
+and enhanced formatting when available.
 """
 
 import argparse
@@ -13,39 +14,146 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
-from pydantic import HttpUrl
+# Import formatting utilities
+try:
+    from .formatting import Formatter, create_formatter, print_banner, print_help_footer
+    FORMATTING_AVAILABLE = True
+except ImportError:
+    FORMATTING_AVAILABLE = False
+    # Create fallback formatter
+    class Formatter:
+        def __init__(self, verbose=False):
+            self.verbose = verbose
 
-from .. import (  # Crawler functionality
-    ContentType,
-    CrawlerCapability,
-    CrawlerType,
-    FetchConfig,
-    FetchRequest,
-    ProgressInfo,
-    StreamingConfig,
-    StreamingWebFetcher,
-    StreamRequest,
-    WebFetcher,
-    configure_crawler,
-    crawler_crawl_website,
-    crawler_fetch_url,
-    crawler_fetch_urls,
-    crawler_search_web,
-    download_file,
-    fetch_url,
-    fetch_urls,
-    fetch_with_cache,
-    get_crawler_status,
-)
+        def print_success(self, message):
+            print(f"✓ {message}")
+
+        def print_error(self, message):
+            print(f"✗ {message}")
+
+        def print_warning(self, message):
+            print(f"⚠ {message}")
+
+        def print_info(self, message):
+            print(f"ℹ {message}")
+
+        def print_json(self, data, title=None):
+            if title:
+                print(f"\n{title}:")
+                print("-" * len(title))
+            print(json.dumps(data, indent=2, default=str))
+
+        def print_table(self, data, title=None):
+            if title:
+                print(f"\n{title}:")
+                print("=" * len(title))
+            if data:
+                headers = list(data[0].keys())
+                print(" | ".join(f"{h:<15}" for h in headers))
+                print("-" * (len(headers) * 17))
+                for row in data:
+                    values = [str(v)[:15] for v in row.values()]
+                    print(" | ".join(f"{v:<15}" for v in values))
+
+        def print_url_result(self, url, result, format_type="summary"):
+            if format_type == "json":
+                self.print_json(result, f"Result for {url}")
+            else:
+                print(f"URL: {url}")
+                print(f"Status: {'✓' if result.get('success') else '✗'} {result.get('status_code', 'Unknown')}")
+                print(f"Content Type: {result.get('content_type', 'Unknown')}")
+                print()
+
+        def create_progress_bar(self, description="Processing"):
+            return self
+
+        def create_status(self, message):
+            return self
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def add_task(self, description, total=None):
+            if self.verbose:
+                print(f"Starting: {description}")
+            return 0
+
+        def advance(self, task_id):
+            pass
+
+        def print_crawler_status(self, status):
+            """Print crawler status in fallback format."""
+            print("\nCrawler API Status:")
+            print("=" * 20)
+            for crawler_name, crawler_info in status.items():
+                is_available = crawler_info.get("available", False)
+                status_text = "✓ Available" if is_available else "✗ Unavailable"
+                has_key = crawler_info.get("api_key_configured", False)
+                key_text = "✓ Configured" if has_key else "✗ Missing"
+                capabilities = crawler_info.get("capabilities", [])
+                cap_text = ", ".join(capabilities) if capabilities else "None"
+
+                print(f"{crawler_name.title():<12}: {status_text:<12} | API Key: {key_text:<12} | Capabilities: {cap_text}")
+            print()
+
+    def create_formatter(verbose=False):
+        return Formatter(verbose)
+
+    def print_banner(title, version="1.0.0"):
+        print(f"🌐 {title} v{version}")
+        print("=" * 50)
+
+    def print_help_footer():
+        print("💡 Tip: Use --verbose for detailed output and --help for command-specific help")
+
+try:
+    from pydantic import HttpUrl
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    HttpUrl = str
+
+try:
+    from .. import (  # Crawler functionality
+        ContentType,
+        CrawlerCapability,
+        CrawlerType,
+        FetchConfig,
+        FetchRequest,
+        ProgressInfo,
+        StreamingConfig,
+        StreamingWebFetcher,
+        StreamRequest,
+        WebFetcher,
+        configure_crawler,
+        crawler_crawl_website,
+        crawler_fetch_url,
+        crawler_fetch_urls,
+        crawler_search_web,
+        download_file,
+        fetch_url,
+        fetch_urls,
+        fetch_with_cache,
+        get_crawler_status,
+    )
+    WEB_FETCH_AVAILABLE = True
+except ImportError as e:
+    WEB_FETCH_AVAILABLE = False
+    print(f"Warning: Web-fetch core functionality not available: {e}")
+    print("Please install missing dependencies: pip install -e .")
+    sys.exit(1)
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create and configure the argument parser."""
+    """Create and configure the argument parser with enhanced formatting."""
     parser = argparse.ArgumentParser(
-        description="Modern async web fetcher with AIOHTTP",
+        description="🌐 Modern async web fetcher with enhanced formatting",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
+✨ Examples:
   # Standard HTTP fetching
   %(prog)s https://httpbin.org/get
   %(prog)s -t json https://httpbin.org/json
@@ -59,6 +167,8 @@ Examples:
   %(prog)s --use-crawler --crawler-operation crawl --max-pages 10 https://example.com
   %(prog)s --crawler-operation search --search-query "Python web scraping"
   %(prog)s --crawler-status
+
+💡 Use --verbose for enhanced output formatting and progress information
         """,
     )
 
@@ -285,10 +395,10 @@ def load_urls_from_file(file_path: Path) -> List[str]:
             ]
         return urls
     except FileNotFoundError:
-        print(f"Error: File not found: {file_path}", file=sys.stderr)
+        print(f"✗ Error: File not found: {file_path}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}", file=sys.stderr)
+        print(f"✗ Error reading file {file_path}: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -409,9 +519,15 @@ def create_progress_callback(verbose: bool = False) -> Callable[[ProgressInfo], 
 
 
 async def main() -> None:
-    """Main CLI function."""
+    """Main CLI function with enhanced formatting."""
+    # Print banner
+    print_banner("Web-Fetch CLI")
+
     parser = create_parser()
     args = parser.parse_args()
+
+    # Create formatter
+    formatter = create_formatter(verbose=args.verbose)
 
     # Handle components subcommand
     if getattr(args, "func", None):
@@ -426,53 +542,79 @@ async def main() -> None:
 
     # Handle crawler status command
     if args.crawler_status:
-        status = get_crawler_status()
-        print(json.dumps(status, indent=2))
+        with formatter.create_status("Checking crawler API status..."):
+            status = get_crawler_status()
+
+        if hasattr(formatter, 'print_crawler_status'):
+            formatter.print_crawler_status(status)
+        else:
+            formatter.print_json(status, "Crawler API Status")
         return
 
     # Handle search operation
     if args.crawler_operation == "search" and args.search_query:
-        if args.verbose:
-            print(f"Searching for: {args.search_query}")
+        formatter.print_info(f"Searching for: {args.search_query}")
 
         try:
             crawler_type = None
             if args.crawler_type:
                 crawler_type = CrawlerType(args.crawler_type)
 
-            result = await crawler_search_web(
-                args.search_query,
-                max_results=args.max_pages or 5,
-                crawler_type=crawler_type,
-            )
+            with formatter.create_status("Performing web search..."):
+                result = await crawler_search_web(
+                    args.search_query,
+                    max_results=args.max_pages or 5,
+                    crawler_type=crawler_type,
+                )
 
-            output = format_output(result, args.format, args.verbose)
+            # Display results
+            if args.format == "json":
+                formatter.print_json(result, "Search Results")
+            else:
+                # Format as table for better readability
+                if result.get("results"):
+                    table_data = []
+                    for r in result.get("results", []):
+                        table_data.append({
+                            "title": r.get("title", "")[:60] + "..." if len(r.get("title", "")) > 60 else r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "snippet": r.get("snippet", "")[:80] + "..." if len(r.get("snippet", "")) > 80 else r.get("snippet", "")
+                        })
+                    formatter.print_table(table_data, "Search Results")
+                else:
+                    formatter.print_warning("No search results found")
 
+            # Save to file if specified
             if args.output:
+                output = format_output(result, args.format, args.verbose)
                 with open(args.output, "w") as f:
                     f.write(output)
-                if args.verbose:
-                    print(f"Search results written to {args.output}")
-            else:
-                print(output)
+                formatter.print_success(f"Search results written to {args.output}")
+
             return
 
         except Exception as e:
-            print(f"Search failed: {e}", file=sys.stderr)
+            formatter.print_error(f"Search failed: {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
             sys.exit(1)
 
     # Determine URLs to fetch
     urls = []
     if args.batch:
+        formatter.print_info(f"Loading URLs from {args.batch}")
         urls = load_urls_from_file(args.batch)
+        formatter.print_success(f"Loaded {len(urls)} URLs")
     elif args.urls:
         urls = args.urls
     else:
-        parser.print_help()
+        formatter.print_error("No URLs provided. Use positional arguments or --batch option.")
+        print_help_footer()
         sys.exit(1)
 
     if not urls:
-        print("Error: No URLs to fetch", file=sys.stderr)
+        formatter.print_error("No valid URLs found to process")
         sys.exit(1)
 
     # Parse content type

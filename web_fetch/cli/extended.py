@@ -16,7 +16,71 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
-from pydantic import AnyUrl
+
+# Import formatting utilities
+try:
+    from .formatting import Formatter, create_formatter, print_banner
+    FORMATTING_AVAILABLE = True
+except ImportError:
+    FORMATTING_AVAILABLE = False
+    # Create fallback formatter
+    class Formatter:
+        def __init__(self, verbose=False):
+            self.verbose = verbose
+
+        def print_success(self, message):
+            click.echo(click.style(f"✓ {message}", fg='green'))
+
+        def print_error(self, message):
+            click.echo(click.style(f"✗ {message}", fg='red'))
+
+        def print_warning(self, message):
+            click.echo(click.style(f"⚠ {message}", fg='yellow'))
+
+        def print_info(self, message):
+            click.echo(click.style(f"ℹ {message}", fg='blue'))
+
+        def print_json(self, data, title=None):
+            if title:
+                click.echo(f"\n{title}:")
+                click.echo("-" * len(title))
+            click.echo(json.dumps(data, indent=2, default=str))
+
+        def print_key_value_pairs(self, data, title=None):
+            if title:
+                click.echo(f"\n{title}:")
+                click.echo("=" * len(title))
+            for key, value in data.items():
+                formatted_key = key.replace("_", " ").title()
+                if isinstance(value, (dict, list)):
+                    formatted_value = json.dumps(value, indent=2)
+                else:
+                    formatted_value = str(value)
+                click.echo(f"{formatted_key:<20}: {formatted_value}")
+
+        def create_status(self, message):
+            return self
+
+        def __enter__(self):
+            click.echo(f"⏳ {getattr(self, 'message', 'Processing...')}")
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    def create_formatter(verbose=False):
+        return Formatter(verbose)
+
+    def print_banner(title, version="1.0.0"):
+        click.echo(f"🌐 {title} v{version}")
+        click.echo("=" * 50)
+
+try:
+    from pydantic import AnyUrl
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    AnyUrl = str
 
 from ..models.resource import ResourceRequest, ResourceKind, ResourceConfig
 from ..models.extended_resources import (
@@ -34,42 +98,43 @@ from ..monitoring import MetricBackend, create_metrics_backend, configure_metric
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output')
 @click.pass_context
 def cli(ctx: click.Context, config: Optional[str], verbose: bool) -> None:
-    """Web-Fetch Extended CLI - Advanced resource fetching and management."""
+    """🌐 Web-Fetch Extended CLI - Advanced resource fetching and management."""
     ctx.ensure_object(dict)
     ctx.obj['config_file'] = config
     ctx.obj['verbose'] = verbose
+    ctx.obj['formatter'] = create_formatter(verbose=verbose)
 
     if verbose:
-        click.echo("Verbose mode enabled")
+        ctx.obj['formatter'].print_info("Verbose mode enabled")
 
 
 @cli.group()
 def test() -> None:
-    """Test configurations and connections for extended resource types."""
+    """🔍 Test configurations and connections for extended resource types."""
     pass
 
 
 @cli.group()
 def fetch() -> None:
-    """Fetch resources using extended resource types."""
+    """📥 Fetch resources using extended resource types."""
     pass
 
 
 @cli.group()
 def cache() -> None:
-    """Advanced cache management operations."""
+    """💾 Advanced cache management operations."""
     pass
 
 
 @cli.group()
 def monitor() -> None:
-    """Monitoring and metrics for extended resources."""
+    """📊 Monitoring and metrics for extended resources."""
     pass
 
 
 @cli.group()
 def config() -> None:
-    """Configuration management and validation."""
+    """⚙️ Configuration management and validation."""
     pass
 
 

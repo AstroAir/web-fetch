@@ -15,10 +15,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
     from web_fetch.cli.extended import cli
-    
+
     if __name__ == '__main__':
+        # Add note about rich version
+        print("💡 For enhanced formatting, try: web-fetch-extended-rich")
         cli()
-        
+
 except ImportError as e:
     print(f"Error importing web-fetch extended CLI: {e}")
     print("Make sure web-fetch is properly installed with extended dependencies:")

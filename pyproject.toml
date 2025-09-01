@@ -30,6 +30,8 @@ dependencies = [
     "lxml>=4.9.0",
     "aiofiles>=23.0.0",
     "aioftp>=0.21.0",
+    # CLI Enhancement
+    "rich>=13.0.0", # Rich terminal formatting and progress bars
     # MCP Framework
     "fastmcp>=0.2.0", # Model Context Protocol framework
     # New resource type dependencies
@@ -109,7 +111,8 @@ all-features = [
 ]
 
 [project.scripts]
-web-fetch = "web_fetch.cli:main"
+web-fetch = "web_fetch.cli.main:main"
+web-fetch-extended = "web_fetch.cli.extended:cli"
 
 [project.urls]
 Homepage = "https://github.com/web-fetch/web-fetch"

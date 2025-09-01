@@ -26,6 +26,13 @@ A powerful, production-ready web fetching library with advanced features includi
 - **Security Features**: Sensitive data masking, rate limiting, and component-specific filtering
 - **Environment Management**: Multi-environment configuration with inheritance and validation
 
+#### Enhanced CLI Interface
+- **Beautiful Formatting**: Integrated rich formatting with colors, progress bars, and tables
+- **Graceful Fallbacks**: Works with or without rich library, automatic fallback formatting
+- **Visual Progress**: Real-time progress bars for batch operations and downloads
+- **Interactive Experience**: Improved user experience with status indicators and formatted output
+- **Unified Interface**: Single CLI with enhanced formatting built-in
+
 #### MCP Integration
 - **Enhanced MCP Server**: Comprehensive Model Context Protocol server with all new features
 - **Advanced Tools**: Batch processing, file operations, pagination, and configuration management
@@ -291,6 +298,47 @@ web-fetch --validate-urls --normalize-urls https://EXAMPLE.COM/path/../other
 
 **Caching Options:**
 - `--cache`: Enable response caching
+
+### 🎨 Enhanced CLI Interface
+
+The CLI now includes integrated enhanced formatting with automatic fallbacks:
+
+```bash
+# Main CLI with enhanced formatting
+web-fetch https://httpbin.org/json --format summary --verbose
+
+# Extended CLI for advanced features
+web-fetch-extended test rss https://feeds.example.com/rss.xml
+```
+
+**Enhanced CLI Features:**
+- 🎨 **Colored Output** - Success (green), errors (red), warnings (yellow), info (blue)
+- 📊 **Progress Bars** - Visual progress for batch operations and downloads
+- 📋 **Formatted Tables** - Beautiful tables for structured data display
+- 🎯 **Status Indicators** - Spinners and status messages for operations
+- 🖼️ **Panels and Layouts** - Organized information display
+- 🌈 **Syntax Highlighting** - JSON, HTML, and code formatting
+- 🔄 **Graceful Fallbacks** - Works even without rich library installed
+
+**Installation for Enhanced Features:**
+```bash
+pip install rich>=13.0.0  # Optional for enhanced formatting
+```
+
+**Enhanced CLI Examples:**
+```bash
+# Batch processing with enhanced progress bars
+web-fetch --batch urls.txt --verbose --concurrent 10
+
+# Download with progress indicator
+web-fetch https://example.com/file.zip --download ./downloads/ --progress
+
+# Crawler operations with enhanced status displays
+web-fetch --use-crawler --crawler-type firecrawl https://example.com --format detailed
+
+# Extended CLI with enhanced formatting
+web-fetch-extended fetch rss https://feeds.example.com/rss.xml --output feed.json --format json
+```
 - `--cache-ttl`: Cache TTL in seconds (default: 300)
 
 **URL Utilities:**

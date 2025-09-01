@@ -1,9 +1,11 @@
 """
-Command-line interface for the web_fetch library.
+Web-Fetch CLI package.
 
-This package provides a modular CLI with separate commands for HTTP and FTP operations.
+This package provides command-line interfaces for the web-fetch library
+with integrated enhanced formatting capabilities.
 """
 
 from .main import main
+from .extended import cli as extended_cli
 
-__all__ = ["main"]
+__all__ = ["main", "extended_cli"]
