@@ -78,7 +78,7 @@ class FirecrawlCrawler(BaseCrawler):
 
     def _prepare_scrape_options(self, request: CrawlerRequest) -> Dict[str, Any]:
         """Prepare scrape options for Firecrawl API."""
-        options = {}
+        options: Dict[str, Any] = {}
 
         # Format options
         formats = ["markdown"]
@@ -113,7 +113,7 @@ class FirecrawlCrawler(BaseCrawler):
 
     def _prepare_crawl_options(self, request: CrawlerRequest) -> Dict[str, Any]:
         """Prepare crawl options for Firecrawl API."""
-        options = self._prepare_scrape_options(request)
+        options: Dict[str, Any] = self._prepare_scrape_options(request)
 
         # Crawl-specific options
         if request.limit or self.config.max_pages:

@@ -26,7 +26,7 @@ class TestWebSocketConfig:
     def test_websocket_config_defaults(self):
         """Test default WebSocket configuration."""
         config = WebSocketConfig(url="wss://example.com/ws")
-        
+
         assert config.url == "wss://example.com/ws"
         assert config.connect_timeout == 10.0
         assert config.heartbeat_interval == 30.0
@@ -45,7 +45,7 @@ class TestWebSocketConfig:
             auto_reconnect=False,
             headers={"Authorization": "Bearer token123"}
         )
-        
+
         assert config.url == "wss://api.example.com/ws"
         assert config.connect_timeout == 20.0
         assert config.heartbeat_interval == 60.0
@@ -59,7 +59,7 @@ class TestWebSocketConfig:
         # Valid config
         config = WebSocketConfig(url="wss://example.com/ws")
         assert config.url.startswith("wss://")
-        
+
         # Test with ws:// URL
         config_ws = WebSocketConfig(url="ws://localhost:8080/ws")
         assert config_ws.url.startswith("ws://")
@@ -74,7 +74,7 @@ class TestWebSocketMessage:
             type=WebSocketMessageType.TEXT,
             data="Hello, WebSocket!"
         )
-        
+
         assert message.type == WebSocketMessageType.TEXT
         assert message.data == "Hello, WebSocket!"
         assert message.timestamp is not None
@@ -87,7 +87,7 @@ class TestWebSocketMessage:
             type=WebSocketMessageType.BINARY,
             data=binary_data
         )
-        
+
         assert message.type == WebSocketMessageType.BINARY
         assert message.data == binary_data
 
@@ -98,7 +98,7 @@ class TestWebSocketMessage:
             type=WebSocketMessageType.JSON,
             data=json_data
         )
-        
+
         assert message.type == WebSocketMessageType.JSON
         assert message.data == json_data
 
@@ -111,7 +111,7 @@ class TestWebSocketMessage:
         )
         serialized = text_msg.serialize()
         assert serialized == "Hello"
-        
+
         # JSON message
         json_msg = WebSocketMessage(
             type=WebSocketMessageType.JSON,
@@ -119,7 +119,7 @@ class TestWebSocketMessage:
         )
         serialized = json_msg.serialize()
         assert json.loads(serialized) == {"key": "value"}
-        
+
         # Binary message
         binary_msg = WebSocketMessage(
             type=WebSocketMessageType.BINARY,
@@ -136,7 +136,7 @@ class TestWebSocketClient:
         """Test WebSocket client creation."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         assert client.config == config
         assert client.state == WebSocketConnectionState.DISCONNECTED
         assert client._websocket is None
@@ -146,13 +146,13 @@ class TestWebSocketClient:
         """Test WebSocket client connection."""
         config = WebSocketConfig(url="wss://echo.websocket.org")
         client = WebSocketClient(config)
-        
-        with patch('websockets.connect') as mock_connect:
+
+        with patch('aiohttp.ClientSession.ws_connect', new_callable=AsyncMock) as mock_ws_connect:
             mock_websocket = AsyncMock()
-            mock_connect.return_value.__aenter__.return_value = mock_websocket
-            
+            mock_ws_connect.return_value = mock_websocket
+
             result = await client.connect()
-            
+
             assert result.success is True
             assert client.state == WebSocketConnectionState.CONNECTED
             assert client._websocket == mock_websocket
@@ -162,12 +162,12 @@ class TestWebSocketClient:
         """Test WebSocket client connection failure."""
         config = WebSocketConfig(url="wss://invalid-url.example.com/ws")
         client = WebSocketClient(config)
-        
-        with patch('websockets.connect') as mock_connect:
-            mock_connect.side_effect = Exception("Connection failed")
-            
+
+        with patch('aiohttp.ClientSession.ws_connect', new_callable=AsyncMock) as mock_ws_connect:
+            mock_ws_connect.side_effect = Exception("Connection failed")
+
             result = await client.connect()
-            
+
             assert result.success is False
             assert "Connection failed" in result.error
             assert client.state == WebSocketConnectionState.DISCONNECTED
@@ -177,78 +177,78 @@ class TestWebSocketClient:
         """Test sending text message."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         # Mock connected state
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         message = WebSocketMessage(
             type=WebSocketMessageType.TEXT,
             data="Hello, Server!"
         )
-        
+
         result = await client.send_message(message)
-        
+
         assert result.success is True
-        client._websocket.send.assert_called_once_with("Hello, Server!")
+        client._websocket.send_str.assert_called_once_with("Hello, Server!")
 
     @pytest.mark.asyncio
     async def test_client_send_json_message(self):
         """Test sending JSON message."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         message = WebSocketMessage(
             type=WebSocketMessageType.JSON,
             data={"action": "ping", "timestamp": 1234567890}
         )
-        
+
         result = await client.send_message(message)
-        
+
         assert result.success is True
         # Should send JSON string
         expected_json = json.dumps({"action": "ping", "timestamp": 1234567890})
-        client._websocket.send.assert_called_once_with(expected_json)
+        client._websocket.send_str.assert_called_once_with(expected_json)
 
     @pytest.mark.asyncio
     async def test_client_send_binary_message(self):
         """Test sending binary message."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         binary_data = b"Binary message content"
         message = WebSocketMessage(
             type=WebSocketMessageType.BINARY,
             data=binary_data
         )
-        
+
         result = await client.send_message(message)
-        
+
         assert result.success is True
-        client._websocket.send.assert_called_once_with(binary_data)
+        client._websocket.send_bytes.assert_called_once_with(binary_data)
 
     @pytest.mark.asyncio
     async def test_client_send_message_not_connected(self):
         """Test sending message when not connected."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         # Client is not connected
         assert client.state == WebSocketConnectionState.DISCONNECTED
-        
+
         message = WebSocketMessage(
             type=WebSocketMessageType.TEXT,
             data="Hello"
         )
-        
+
         result = await client.send_message(message)
-        
+
         assert result.success is False
         assert "not connected" in result.error.lower()
 
@@ -257,15 +257,15 @@ class TestWebSocketClient:
         """Test receiving message."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         # Mock received message
         client._websocket.recv.return_value = "Hello from server"
-        
+
         message = await client.receive_message()
-        
+
         assert message is not None
         assert message.type == WebSocketMessageType.TEXT
         assert message.data == "Hello from server"
@@ -275,16 +275,16 @@ class TestWebSocketClient:
         """Test receiving JSON message."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         # Mock received JSON message
         json_data = {"status": "ok", "data": [1, 2, 3]}
         client._websocket.recv.return_value = json.dumps(json_data)
-        
+
         message = await client.receive_message()
-        
+
         assert message is not None
         # Should auto-detect JSON and parse it
         if message.type == WebSocketMessageType.JSON:
@@ -299,13 +299,13 @@ class TestWebSocketClient:
         """Test WebSocket client disconnection."""
         config = WebSocketConfig(url="wss://example.com/ws")
         client = WebSocketClient(config)
-        
+
         # Mock connected state
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         await client.disconnect()
-        
+
         assert client.state == WebSocketConnectionState.DISCONNECTED
         assert client._websocket is None
 
@@ -317,24 +317,24 @@ class TestWebSocketClient:
             heartbeat_interval=0.1  # Fast heartbeat for testing
         )
         client = WebSocketClient(config)
-        
+
         client.state = WebSocketConnectionState.CONNECTED
         client._websocket = AsyncMock()
-        
+
         # Start heartbeat
         heartbeat_task = asyncio.create_task(client._heartbeat_loop())
-        
+
         # Let it run for a short time
         await asyncio.sleep(0.2)
-        
+
         # Cancel heartbeat
         heartbeat_task.cancel()
-        
+
         try:
             await heartbeat_task
         except asyncio.CancelledError:
             pass
-        
+
         # Should have sent at least one ping
         assert client._websocket.ping.call_count >= 1
 
@@ -348,34 +348,34 @@ class TestWebSocketClient:
             reconnect_delay=0.1
         )
         client = WebSocketClient(config)
-        
+
         with patch('websockets.connect') as mock_connect:
             # First connection succeeds
             mock_websocket = AsyncMock()
             mock_connect.return_value.__aenter__.return_value = mock_websocket
-            
+
             # Connect initially
             await client.connect()
             assert client.state == WebSocketConnectionState.CONNECTED
-            
+
             # Simulate connection loss
             client.state = WebSocketConnectionState.DISCONNECTED
             client._websocket = None
-            
+
             # Start reconnect process
             reconnect_task = asyncio.create_task(client._reconnect_loop())
-            
+
             # Let it attempt reconnection
             await asyncio.sleep(0.3)
-            
+
             # Cancel reconnect task
             reconnect_task.cancel()
-            
+
             try:
                 await reconnect_task
             except asyncio.CancelledError:
                 pass
-            
+
             # Should have attempted to reconnect
             assert mock_connect.call_count > 1
 
@@ -386,7 +386,7 @@ class TestWebSocketManager:
     def test_manager_creation(self):
         """Test WebSocket manager creation."""
         manager = WebSocketManager()
-        
+
         assert len(manager._clients) == 0
         assert manager._running is False
 
@@ -394,10 +394,10 @@ class TestWebSocketManager:
     async def test_manager_add_client(self):
         """Test adding client to manager."""
         manager = WebSocketManager()
-        
+
         config = WebSocketConfig(url="wss://example.com/ws")
         client_id = await manager.add_client("test-client", config)
-        
+
         assert client_id == "test-client"
         assert "test-client" in manager._clients
         assert isinstance(manager._clients["test-client"], WebSocketClient)
@@ -406,14 +406,14 @@ class TestWebSocketManager:
     async def test_manager_remove_client(self):
         """Test removing client from manager."""
         manager = WebSocketManager()
-        
+
         config = WebSocketConfig(url="wss://example.com/ws")
         await manager.add_client("test-client", config)
-        
+
         assert "test-client" in manager._clients
-        
+
         success = await manager.remove_client("test-client")
-        
+
         assert success is True
         assert "test-client" not in manager._clients
 
@@ -421,15 +421,15 @@ class TestWebSocketManager:
     async def test_manager_connect_client(self):
         """Test connecting client through manager."""
         manager = WebSocketManager()
-        
+
         config = WebSocketConfig(url="wss://example.com/ws")
         await manager.add_client("test-client", config)
-        
+
         with patch.object(manager._clients["test-client"], 'connect') as mock_connect:
             mock_connect.return_value = WebSocketResult(success=True)
-            
+
             result = await manager.connect_client("test-client")
-            
+
             assert result.success is True
             mock_connect.assert_called_once()
 
@@ -437,20 +437,20 @@ class TestWebSocketManager:
     async def test_manager_send_message(self):
         """Test sending message through manager."""
         manager = WebSocketManager()
-        
+
         config = WebSocketConfig(url="wss://example.com/ws")
         await manager.add_client("test-client", config)
-        
+
         message = WebSocketMessage(
             type=WebSocketMessageType.TEXT,
             data="Hello from manager"
         )
-        
+
         with patch.object(manager._clients["test-client"], 'send_message') as mock_send:
             mock_send.return_value = WebSocketResult(success=True)
-            
+
             result = await manager.send_message("test-client", message)
-            
+
             assert result.success is True
             mock_send.assert_called_once_with(message)
 
@@ -458,26 +458,26 @@ class TestWebSocketManager:
     async def test_manager_broadcast_message(self):
         """Test broadcasting message to all clients."""
         manager = WebSocketManager()
-        
+
         # Add multiple clients
         config1 = WebSocketConfig(url="wss://example1.com/ws")
         config2 = WebSocketConfig(url="wss://example2.com/ws")
-        
+
         await manager.add_client("client1", config1)
         await manager.add_client("client2", config2)
-        
+
         message = WebSocketMessage(
             type=WebSocketMessageType.TEXT,
             data="Broadcast message"
         )
-        
+
         with patch.object(manager._clients["client1"], 'send_message') as mock_send1:
             with patch.object(manager._clients["client2"], 'send_message') as mock_send2:
                 mock_send1.return_value = WebSocketResult(success=True)
                 mock_send2.return_value = WebSocketResult(success=True)
-                
+
                 results = await manager.broadcast_message(message)
-                
+
                 assert len(results) == 2
                 assert all(result.success for result in results.values())
                 mock_send1.assert_called_once_with(message)
@@ -487,12 +487,12 @@ class TestWebSocketManager:
     async def test_manager_get_client_status(self):
         """Test getting client status."""
         manager = WebSocketManager()
-        
+
         config = WebSocketConfig(url="wss://example.com/ws")
         await manager.add_client("test-client", config)
-        
+
         status = await manager.get_client_status("test-client")
-        
+
         assert status is not None
         assert "state" in status
         assert "url" in status
@@ -502,15 +502,15 @@ class TestWebSocketManager:
     async def test_manager_get_all_clients_status(self):
         """Test getting all clients status."""
         manager = WebSocketManager()
-        
+
         config1 = WebSocketConfig(url="wss://example1.com/ws")
         config2 = WebSocketConfig(url="wss://example2.com/ws")
-        
+
         await manager.add_client("client1", config1)
         await manager.add_client("client2", config2)
-        
+
         all_status = await manager.get_all_clients_status()
-        
+
         assert len(all_status) == 2
         assert "client1" in all_status
         assert "client2" in all_status

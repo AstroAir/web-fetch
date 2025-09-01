@@ -271,7 +271,7 @@ class FairQueue(PriorityQueue):
                     age = current_time - item.timestamp
                     aged_priority = item.priority - (age * self.aging_factor)
                     aged_item = QueueItem(
-                        priority=aged_priority,
+                        priority=int(aged_priority),
                         timestamp=item.timestamp,
                         sequence=item.sequence,
                         data=item.data,
@@ -299,7 +299,7 @@ class BatchPriorityQueue(PriorityQueue):
         super().__init__(maxsize)
 
     async def put_batch(
-        self, batch_request, block: bool = True, timeout: Optional[float] = None
+        self, batch_request: Any, block: bool = True, timeout: Optional[float] = None
     ) -> None:
         """
         Put a batch request into the queue.

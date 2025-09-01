@@ -8,9 +8,9 @@ concurrency control, progress tracking, and error handling.
 import asyncio
 import logging
 import time
-from typing import Callable, Dict, List, Optional, Set
+from typing import AsyncGenerator, Callable, Dict, List, Optional, Set
 
-from ..models import FetchConfig
+from ..models import FetchConfig, FetchRequest, FetchResult
 from ..core_fetcher import WebFetcher
 from .models import BatchConfig, BatchRequest, BatchResult, BatchStatus
 
@@ -89,7 +89,7 @@ class BatchProcessor:
             # Finalize result
             result.status = BatchStatus.COMPLETED
             result.completed_at = time.time()
-            result.total_time = result.completed_at - result.started_at
+            result.total_time = result.completed_at - (result.started_at or 0.0)
 
             logger.info(
                 f"Batch {batch_id} completed: {result.successful_requests}/{result.total_requests} successful"
@@ -142,7 +142,7 @@ class BatchProcessor:
     async def _process_single_request(
         self,
         fetcher: WebFetcher,
-        request,
+        request: FetchRequest,
         semaphore: asyncio.Semaphore,
         batch_id: str,
         request_index: int,
@@ -254,7 +254,7 @@ class StreamingBatchProcessor(BatchProcessor):
 
             result.status = BatchStatus.COMPLETED
             result.completed_at = time.time()
-            result.total_time = result.completed_at - result.started_at
+            result.total_time = result.completed_at - (result.started_at or 0.0)
 
         except Exception as e:
             result.status = BatchStatus.FAILED
@@ -263,13 +263,13 @@ class StreamingBatchProcessor(BatchProcessor):
 
         return result
 
-    async def _stream_requests(self, fetcher, requests, semaphore, batch_id):
+    async def _stream_requests(self, fetcher: WebFetcher, requests: List[FetchRequest], semaphore: asyncio.Semaphore, batch_id: str) -> AsyncGenerator[FetchResult, None]:
         """Stream individual request results as they complete."""
         # Create queue for results
-        result_queue = asyncio.Queue()
+        result_queue: asyncio.Queue = asyncio.Queue()
 
         # Create tasks
-        async def process_request(request, index):
+        async def process_request(request: FetchRequest, index: int) -> None:
             async with semaphore:
                 if batch_id in self._cancelled_batches:
                     return
@@ -284,7 +284,6 @@ class StreamingBatchProcessor(BatchProcessor):
                     error_result = FetchResult(
                         url=getattr(request, "url", "unknown"),
                         status_code=0,
-                        is_success=False,
                         error=str(e),
                     )
                     await result_queue.put(error_result)

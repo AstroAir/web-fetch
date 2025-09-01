@@ -29,7 +29,8 @@ websockets>=12.0
 
 # GraphQL support
 gql>=3.4.0
-aiohttp-graphql>=1.2.0
+# aiohttp-graphql 1.2.0+ not available; relax to latest published <1.2.0
+aiohttp-graphql>=1.0.0,<1.2.0
 
 # Enhanced authentication
 authlib>=1.2.0

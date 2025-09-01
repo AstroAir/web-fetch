@@ -23,10 +23,10 @@ try:
 except ImportError:
     HAS_PLAYWRIGHT = False
     # Type stubs for when playwright is not available
-    Browser = None
-    BrowserContext = None
-    Page = None
-    Playwright = None
+    Browser = None  # type: ignore
+    BrowserContext = None  # type: ignore
+    Page = None  # type: ignore
+    Playwright = None  # type: ignore
 
 from ..exceptions import WebFetchError
 
@@ -139,7 +139,7 @@ class JavaScriptRenderer:
                 "ignore_https_errors": True,
             }
 
-            self.context = await self.browser.new_context(**context_options)
+            self.context = await self.browser.new_context(**context_options)  # type: ignore
 
             # Set up resource blocking
             if self.config.block_resources:
@@ -180,6 +180,9 @@ class JavaScriptRenderer:
         if not self.context:
             await self.start()
 
+        if not self.context:
+            raise WebFetchError("Failed to initialize browser context")
+
         page = None
         try:
             page = await self.context.new_page()
@@ -201,7 +204,7 @@ class JavaScriptRenderer:
             # Set up wait condition
             wait_until = self._get_wait_until(wait_strategy)
 
-            response = await page.goto(url, timeout=timeout, wait_until=wait_until)
+            response = await page.goto(url, timeout=timeout, wait_until=wait_until)  # type: ignore
 
             if not response:
                 raise WebFetchError(f"Failed to load page: {url}")
@@ -255,7 +258,7 @@ class JavaScriptRenderer:
                 // Remove script and style elements
                 const scripts = document.querySelectorAll('script, style');
                 scripts.forEach(el => el.remove());
-                
+
                 // Get text content
                 return document.body ? document.body.innerText : '';
             }
@@ -298,16 +301,16 @@ class JavaScriptRenderer:
             () => {
                 const metas = Array.from(document.querySelectorAll('meta'));
                 const result = {};
-                
+
                 metas.forEach(meta => {
                     const name = meta.getAttribute('name') || meta.getAttribute('property');
                     const content = meta.getAttribute('content');
-                    
+
                     if (name && content) {
                         result[name] = content;
                     }
                 });
-                
+
                 return result;
             }
         """
@@ -380,7 +383,7 @@ class JavaScriptRenderer:
         else:
             await route.continue_()
 
-    async def screenshot(self, url: str, path: Optional[str] = None, **kwargs) -> bytes:
+    async def screenshot(self, url: str, path: Optional[str] = None, **kwargs: Any) -> bytes:
         """
         Take a screenshot of the rendered page.
 
@@ -394,6 +397,9 @@ class JavaScriptRenderer:
         """
         if not self.context:
             await self.start()
+
+        if not self.context:
+            raise WebFetchError("Failed to initialize browser context")
 
         page = None
         try:
@@ -416,7 +422,7 @@ class JavaScriptRenderer:
             if page:
                 await page.close()
 
-    async def get_page_source(self, url: str, **kwargs) -> str:
+    async def get_page_source(self, url: str, **kwargs: Any) -> str:
         """
         Get the rendered HTML source of a page.
 
@@ -428,7 +434,7 @@ class JavaScriptRenderer:
             Rendered HTML source
         """
         result = await self.render_page(url, **kwargs)
-        return result.get("html_content", "")
+        return str(result.get("html_content", ""))
 
     def is_available(self) -> bool:
         """Check if JavaScript rendering is available."""
@@ -469,7 +475,7 @@ class JavaScriptRenderer:
 
 # Convenience functions
 async def render_js_page(
-    url: str, config: Optional[JSRenderConfig] = None, **kwargs
+    url: str, config: Optional[JSRenderConfig] = None, **kwargs: Any
 ) -> Dict[str, Any]:
     """
     Convenience function to render a single JavaScript page.
@@ -487,7 +493,7 @@ async def render_js_page(
 
 
 async def get_js_page_source(
-    url: str, config: Optional[JSRenderConfig] = None, **kwargs
+    url: str, config: Optional[JSRenderConfig] = None, **kwargs: Any
 ) -> str:
     """
     Convenience function to get rendered HTML source.

@@ -184,7 +184,7 @@ class JSONParser:
         }
 
         # Extract links
-        links = {}
+        links: Dict[str, Union[Dict[str, Any], List[Dict[str, Any]]]] = {}
         if "_links" in data:
             for rel, link_data in data["_links"].items():
                 if isinstance(link_data, dict):
@@ -357,12 +357,13 @@ class JSONParser:
         self, data: Any, url: Optional[str]
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """Parse generic JSON data."""
-        metadata = {
+        metadata: Dict[str, Any] = {
             "format": "Generic JSON",
             "root_type": type(data).__name__,
         }
 
         # Handle different root types
+        structured_data: Dict[str, Any]
         if isinstance(data, dict):
             structured_data = {
                 "type": "object",

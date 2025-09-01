@@ -389,7 +389,7 @@ class FileCacheBackend(CacheBackendInterface):
                     # Write back updated entry
                     async with aiofiles.open(cache_file, "wb") as f:
                         await f.write(pickle.dumps(entry))
-                    return entry
+                    return entry  # type: ignore[no-any-return]
                 else:
                     # Remove expired entry
                     cache_file.unlink(missing_ok=True)
@@ -474,7 +474,7 @@ class RedisCacheBackend(CacheBackendInterface):
         self._redis = None
         self._lock = asyncio.Lock()
 
-    async def _get_redis(self):
+    async def _get_redis(self) -> Any:
         """Get or create Redis connection."""
         if self._redis is None:
             try:
@@ -513,7 +513,7 @@ class RedisCacheBackend(CacheBackendInterface):
                             pickle.dumps(entry),
                             ex=int(entry.ttl) if entry.ttl else None,
                         )
-                        return entry
+                        return entry  # type: ignore[no-any-return]
                     else:
                         # Remove expired entry
                         await redis.delete(redis_key)
@@ -521,6 +521,8 @@ class RedisCacheBackend(CacheBackendInterface):
 
             except Exception:
                 return None
+
+        return None
 
     async def set(self, entry: EnhancedCacheEntry) -> bool:
         """Set cache entry in Redis."""
@@ -587,10 +589,10 @@ class RedisCacheBackend(CacheBackendInterface):
             except Exception:
                 return 0
 
-    async def close(self):
+    async def close(self) -> None:
         """Close Redis connection."""
         if self._redis:
-            await self._redis.close()
+            await self._redis.close()  # type: ignore[unreachable]
 
 
 class EnhancedCache:

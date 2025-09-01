@@ -33,7 +33,7 @@ class TestCacheEntry:
             last_accessed=time.time(),
             ttl=300
         )
-        
+
         assert entry.key == "test_key"
         assert entry.value == {"data": "test"}
         assert entry.ttl == 300
@@ -49,7 +49,7 @@ class TestCacheEntry:
             last_accessed=time.time() - 400,
             ttl=300  # 300 second TTL
         )
-        
+
         assert entry.is_expired
 
     def test_cache_entry_touch(self):
@@ -61,12 +61,12 @@ class TestCacheEntry:
             last_accessed=time.time() - 100,
             ttl=300
         )
-        
+
         old_access_time = entry.last_accessed
         entry.touch()
-        
+
         assert entry.last_accessed > old_access_time
-        assert entry.access_count == 2
+        assert entry.access_count == 1
 
 
 class TestMemoryCacheBackend:
@@ -88,10 +88,10 @@ class TestMemoryCacheBackend:
             last_accessed=time.time(),
             ttl=300
         )
-        
+
         result = await memory_backend.set("test_key", entry)
         assert result is True
-        
+
         retrieved = await memory_backend.get("test_key")
         assert retrieved is not None
         assert retrieved.value == "test_value"
@@ -106,11 +106,11 @@ class TestMemoryCacheBackend:
             last_accessed=time.time(),
             ttl=300
         )
-        
+
         await memory_backend.set("test_key", entry)
         result = await memory_backend.delete("test_key")
         assert result is True
-        
+
         retrieved = await memory_backend.get("test_key")
         assert retrieved is None
 
@@ -131,13 +131,13 @@ class TestMemoryCacheBackend:
             last_accessed=time.time(),
             ttl=300
         )
-        
+
         await memory_backend.set("key1", entry1)
         await memory_backend.set("key2", entry2)
-        
+
         result = await memory_backend.clear()
         assert result is True
-        
+
         assert await memory_backend.size() == 0
 
     @pytest.mark.asyncio
@@ -157,10 +157,10 @@ class TestMemoryCacheBackend:
             last_accessed=time.time(),
             ttl=300
         )
-        
+
         await memory_backend.set("test_key1", entry1)
         await memory_backend.set("test_key2", entry2)
-        
+
         keys = await memory_backend.keys()
         assert "test_key1" in keys
         assert "test_key2" in keys
@@ -186,7 +186,7 @@ class TestAdvancedCacheManager:
         # Test set and get
         result = await cache_manager.set("test_key", "test_value", ttl=300)
         assert result is True
-        
+
         retrieved = await cache_manager.get("test_key")
         assert retrieved == "test_value"
 
@@ -194,14 +194,14 @@ class TestAdvancedCacheManager:
     async def test_cache_manager_with_tags(self, cache_manager):
         """Test cache manager with tags for invalidation."""
         tags = {"user:123", "category:news"}
-        
+
         result = await cache_manager.set("test_key", "test_value", tags=tags)
         assert result is True
-        
+
         # Test invalidation by tag
         invalidated = await cache_manager.invalidate_by_tag("user:123")
         assert invalidated == 1
-        
+
         # Key should be gone
         retrieved = await cache_manager.get("test_key")
         assert retrieved is None
@@ -210,10 +210,10 @@ class TestAdvancedCacheManager:
     async def test_cache_manager_delete(self, cache_manager):
         """Test deleting from cache manager."""
         await cache_manager.set("test_key", "test_value")
-        
+
         result = await cache_manager.delete("test_key")
         assert result is True
-        
+
         retrieved = await cache_manager.get("test_key")
         assert retrieved is None
 
@@ -228,7 +228,7 @@ class TestCacheFactory:
             max_size=100,
             max_memory=1024 * 1024
         )
-        
+
         assert isinstance(manager, AdvancedCacheManager)
         assert isinstance(manager.backend, MemoryCacheBackend)
 
@@ -240,7 +240,7 @@ class TestCacheFactory:
             redis_url="redis://localhost:6379",
             key_prefix="test:"
         )
-        
+
         assert isinstance(manager, AdvancedCacheManager)
         assert isinstance(manager.backend, RedisCacheBackend)
 

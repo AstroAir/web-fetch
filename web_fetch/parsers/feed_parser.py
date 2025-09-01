@@ -149,12 +149,12 @@ class FeedParser:
         # Image information
         if hasattr(feed_info, "image") and feed_info.image:
             metadata.image = {
-                "url": getattr(feed_info.image, "href", None)
-                or getattr(feed_info.image, "url", None),
-                "title": getattr(feed_info.image, "title", None),
-                "link": getattr(feed_info.image, "link", None),
-                "width": getattr(feed_info.image, "width", None),
-                "height": getattr(feed_info.image, "height", None),
+                "url": str(getattr(feed_info.image, "href", None)
+                or getattr(feed_info.image, "url", None) or ""),
+                "title": str(getattr(feed_info.image, "title", None) or ""),
+                "link": str(getattr(feed_info.image, "link", None) or ""),
+                "width": str(getattr(feed_info.image, "width", None) or ""),
+                "height": str(getattr(feed_info.image, "height", None) or ""),
             }
 
         # Feed type and version
@@ -217,9 +217,9 @@ class FeedParser:
             if hasattr(entry, "enclosures") and entry.enclosures:
                 enclosure = entry.enclosures[0]
                 item.enclosure = {
-                    "url": getattr(enclosure, "href", None),
-                    "type": getattr(enclosure, "type", None),
-                    "length": getattr(enclosure, "length", None),
+                    "url": str(getattr(enclosure, "href", None) or ""),
+                    "type": str(getattr(enclosure, "type", None) or ""),
+                    "length": str(getattr(enclosure, "length", None) or ""),
                 }
 
             # Source

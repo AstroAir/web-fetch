@@ -48,7 +48,7 @@ class TestGlobalConfig:
     def test_nested_config_updates(self):
         """Test updating nested configuration."""
         config = GlobalConfig()
-        
+
         # Update logging config
         config.logging.level = LogLevel.DEBUG
         config.logging.enable_file = True
@@ -59,12 +59,12 @@ class TestGlobalConfig:
     def test_feature_flags(self):
         """Test feature flags configuration."""
         config = GlobalConfig()
-        
+
         # Test default feature flags
         assert config.features.enable_caching is True
         assert config.features.enable_rate_limiting is True
         assert config.features.enable_metrics is True
-        
+
         # Update feature flags
         config.features.enable_caching = False
         config.features.enable_js_rendering = True
@@ -79,7 +79,7 @@ class TestConfigLoader:
     def test_load_from_dict(self):
         """Test loading configuration from dictionary."""
         loader = ConfigLoader()
-        
+
         config_dict = {
             "environment": "production",
             "debug": False,
@@ -92,7 +92,7 @@ class TestConfigLoader:
                 "max_redirects": 5
             }
         }
-        
+
         config = loader.load_from_dict(config_dict)
 
         assert config.environment.environment == Environment.PRODUCTION
@@ -105,7 +105,7 @@ class TestConfigLoader:
     def test_load_from_env(self):
         """Test loading configuration from environment variables."""
         loader = ConfigLoader()
-        
+
         with patch.dict(os.environ, {
             'WEB_FETCH_ENVIRONMENT': 'production',
             'WEB_FETCH_DEBUG': 'false',
@@ -114,7 +114,7 @@ class TestConfigLoader:
             'WEB_FETCH_MAX_CONNECTIONS': '20'
         }):
             config = loader.load_from_env()
-            
+
             assert config.environment.environment == Environment.PRODUCTION
             assert config.environment.debug is False
             assert config.logging.level == LogLevel.ERROR
@@ -124,7 +124,7 @@ class TestConfigLoader:
     def test_load_from_file_json(self):
         """Test loading configuration from JSON file."""
         loader = ConfigLoader()
-        
+
         config_content = '''
         {
             "environment": "staging",
@@ -135,27 +135,31 @@ class TestConfigLoader:
             }
         }
         '''
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             f.write(config_content)
             f.flush()
-            
-            try:
-                config = loader.load_from_file(f.name)
-                
-                assert config.environment.environment == Environment.STAGING
-                assert config.environment.debug is True
-                assert config.logging.level == LogLevel.DEBUG
-                assert str(config.logging.file_path) == "/tmp/web_fetch.log"
-            finally:
-                os.unlink(f.name)
+            temp_file_name = f.name
 
-    @pytest.mark.skipif(not hasattr(ConfigLoader, '_has_yaml') or not ConfigLoader._has_yaml, 
+        try:
+            config = loader.load_from_file(temp_file_name)
+
+            assert config.environment.environment == Environment.STAGING
+            assert config.environment.debug is True
+            assert config.logging.level == LogLevel.DEBUG
+            assert str(config.logging.file_path).replace("\\", "/") == "/tmp/web_fetch.log"
+        finally:
+            try:
+                os.unlink(temp_file_name)
+            except PermissionError:
+                pass  # Ignore permission errors on Windows
+
+    @pytest.mark.skipif(not hasattr(ConfigLoader, '_has_yaml') or not ConfigLoader._has_yaml,
                        reason="PyYAML not available")
     def test_load_from_file_yaml(self):
         """Test loading configuration from YAML file."""
         loader = ConfigLoader()
-        
+
         config_content = '''
         environment: staging
         debug: true
@@ -163,14 +167,14 @@ class TestConfigLoader:
           level: debug
           log_file: /tmp/web_fetch.log
         '''
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             f.write(config_content)
             f.flush()
-            
+
             try:
                 config = loader.load_from_file(f.name)
-                
+
                 assert config.environment == Environment.STAGING
                 assert config.debug is True
                 assert config.logging.level == LogLevel.DEBUG
@@ -181,20 +185,20 @@ class TestConfigLoader:
     def test_load_from_nonexistent_file(self):
         """Test loading from non-existent file."""
         loader = ConfigLoader()
-        
+
         with pytest.raises(FileNotFoundError):
             loader.load_from_file("/nonexistent/config.json")
 
     def test_load_from_invalid_json(self):
         """Test loading from invalid JSON file."""
         loader = ConfigLoader()
-        
+
         invalid_content = '{"environment": "production", "debug": true'  # Missing closing brace
-        
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             f.write(invalid_content)
             f.flush()
-            
+
             try:
                 with pytest.raises(ValueError):
                     loader.load_from_file(f.name)
@@ -209,9 +213,9 @@ class TestConfigValidator:
         """Test validation of valid configuration."""
         validator = ConfigValidator()
         config = GlobalConfig()
-        
+
         is_valid, errors, warnings = validator.validate(config)
-        
+
         assert is_valid is True
         assert len(errors) == 0
 
@@ -219,12 +223,12 @@ class TestConfigValidator:
         """Test validation of invalid timeout values."""
         validator = ConfigValidator()
         config = GlobalConfig()
-        
+
         # Set invalid timeout
         config.performance.connection_timeout = -1.0
-        
+
         is_valid, errors, warnings = validator.validate(config)
-        
+
         assert is_valid is False
         assert len(errors) > 0
         assert any("timeout" in error.lower() for error in errors)
@@ -233,12 +237,12 @@ class TestConfigValidator:
         """Test validation of invalid max requests."""
         validator = ConfigValidator()
         config = GlobalConfig()
-        
+
         # Set invalid max requests
         config.performance.max_concurrent_requests = 0
-        
+
         is_valid, errors, warnings = validator.validate(config)
-        
+
         assert is_valid is False
         assert len(errors) > 0
         assert any("concurrent" in error.lower() for error in errors)
@@ -247,14 +251,14 @@ class TestConfigValidator:
         """Test validation of invalid log file path."""
         validator = ConfigValidator()
         config = GlobalConfig()
-        
+
         # Set invalid log file path
         from pathlib import Path
         config.logging.file_path = Path("/invalid/path/that/does/not/exist/log.txt")
         config.logging.enable_file = True
-        
+
         is_valid, errors, warnings = validator.validate(config)
-        
+
         assert is_valid is False
         assert len(errors) > 0
 
@@ -266,13 +270,13 @@ class TestConfigManager:
         """Test that config manager is a singleton."""
         manager1 = ConfigManager()
         manager2 = ConfigManager()
-        
+
         assert manager1 is manager2
 
     def test_load_config_from_dict(self):
         """Test loading configuration from dictionary."""
         manager = ConfigManager()
-        
+
         config_dict = {
             "environment": "production",
             "debug": False,
@@ -280,10 +284,10 @@ class TestConfigManager:
                 "level": "warning"
             }
         }
-        
+
         manager.load_from_dict(config_dict)
         config = manager.get_config()
-        
+
         assert config.environment.environment == Environment.PRODUCTION
         assert config.environment.debug is False
         assert config.logging.level == LogLevel.WARNING
@@ -291,15 +295,15 @@ class TestConfigManager:
     def test_update_config(self):
         """Test updating configuration."""
         manager = ConfigManager()
-        
+
         # Initial config
         manager.load_from_dict({"debug": True})
         assert manager.get_config().environment.debug is True
-        
+
         # Update config
         updates = {"debug": False, "logging": {"level": "error"}}
         manager.update_config(updates)
-        
+
         config = manager.get_config()
         assert config.environment.debug is False
         assert config.logging.level == LogLevel.ERROR
@@ -307,16 +311,16 @@ class TestConfigManager:
     def test_get_nested_value(self):
         """Test getting nested configuration values."""
         manager = ConfigManager()
-        
+
         config_dict = {
             "logging": {
                 "level": "debug",
                 "enable_file_logging": True
             }
         }
-        
+
         manager.load_from_dict(config_dict)
-        
+
         assert manager.get("logging.level") == LogLevel.DEBUG
         assert manager.get("logging.enable_file") is True
         assert manager.get("nonexistent.key", "default") == "default"
@@ -330,7 +334,7 @@ class TestConfigManager:
 
         manager.set("logging.level", "warning")
         manager.set("security.verify_ssl", False)
-        
+
         config = manager.get_config()
         assert config.logging.level == LogLevel.WARNING
         assert config.security.verify_ssl is False
@@ -338,14 +342,14 @@ class TestConfigManager:
     def test_config_validation_on_load(self):
         """Test that configuration is validated when loaded."""
         manager = ConfigManager()
-        
+
         # Invalid config
         invalid_config = {
             "performance": {
                 "max_concurrent_requests": -1  # Invalid negative value
             }
         }
-        
+
         with pytest.raises(Exception):  # Could be ValidationError or ValueError
             manager.load_from_dict(invalid_config)
 
@@ -354,7 +358,7 @@ class TestConfigManager:
         # Test that the global instance works
         config_manager.load_from_dict({"debug": True})
         assert config_manager.get_config().environment.debug is True
-        
+
         # Reset for other tests
         config_manager.load_from_dict({})
 
@@ -365,14 +369,14 @@ class TestEnvironmentConfig:
     def test_development_environment(self):
         """Test development environment configuration."""
         config = EnvironmentConfig.for_environment(Environment.DEVELOPMENT)
-        
+
         assert config.environment.debug is True
         assert config.logging.level == LogLevel.DEBUG
 
     def test_production_environment(self):
         """Test production environment configuration."""
         config = EnvironmentConfig.for_environment(Environment.PRODUCTION)
-        
+
         assert config.environment.debug is False
         assert config.logging.level == LogLevel.WARNING
         assert config.security.verify_ssl is True
@@ -380,7 +384,7 @@ class TestEnvironmentConfig:
     def test_testing_environment(self):
         """Test testing environment configuration."""
         config = EnvironmentConfig.for_environment(Environment.TESTING)
-        
+
         assert config.environment.debug is True
         assert config.logging.level == LogLevel.DEBUG
         # Testing might have different security settings

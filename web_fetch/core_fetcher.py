@@ -26,6 +26,7 @@ import aiohttp
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from aiohttp.resolver import AsyncResolver
 from bs4 import BeautifulSoup
+from pydantic import HttpUrl
 
 from web_fetch.exceptions import (
     ContentError,
@@ -212,14 +213,14 @@ class AdaptiveRetryStrategy:
 
         jitter = random.uniform(0.75, 1.25)
 
-        return min(delay * jitter, 60.0)  # Cap at 60 seconds
+        return float(min(delay * jitter, 60.0))  # Cap at 60 seconds
 
-    def record_error(self, url: str):
+    def record_error(self, url: str) -> None:
         """Record an error for adaptive learning."""
         host = urlparse(url).netloc
         self._host_error_rates[host]["errors"] += 1
 
-    def record_success(self, url: str):
+    def record_success(self, url: str) -> None:
         """Record a success to help recovery detection."""
         host = urlparse(url).netloc
         # Don't increment requests here as it's already done in should_retry
@@ -677,7 +678,7 @@ class WebFetcher:
 
         # Check enhanced cache first
         if self._enhanced_cache:
-            cached_result = await self._enhanced_cache.get(url, request.headers)
+            cached_result: Optional[FetchResult] = await self._enhanced_cache.get(url, request.headers)
             if cached_result:
                 logger.debug(f"Enhanced cache hit for {url}")
                 if self.enable_metrics:
@@ -692,7 +693,7 @@ class WebFetcher:
 
         # Handle request deduplication
         if self.enable_deduplication:
-            result = await deduplicate_request(
+            result: FetchResult = await deduplicate_request(
                 url=url,
                 method=request.method,
                 headers=request.headers,
@@ -819,7 +820,7 @@ class WebFetcher:
         requested_type: ContentType,
         url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-    ) -> Union[str, bytes, Dict[str, Any], None]:
+    ) -> Union[str, bytes, Dict[str, Any], List[Any], None]:
         """
         Parse response content based on requested content type.
 
@@ -877,7 +878,8 @@ class WebFetcher:
                     # First decode bytes to string, then parse JSON
                     # This two-step process allows us to distinguish between encoding and JSON errors
                     text_content = content_bytes.decode("utf-8")
-                    return json.loads(text_content)
+                    parsed_json: Union[Dict[str, Any], List[Any]] = json.loads(text_content)
+                    return parsed_json
                 except (UnicodeDecodeError, json.JSONDecodeError) as e:
                     # Provide specific error information for debugging
                     from web_fetch.exceptions import ContentError
@@ -949,7 +951,7 @@ class WebFetcher:
                     )
 
             case _:
-                return content_bytes.decode("utf-8", errors="replace")
+                return content_bytes.decode("utf-8", errors="replace")  # type: ignore[unreachable]
 
     def _calculate_retry_delay(self, attempt: int) -> float:
         """
@@ -980,19 +982,20 @@ class WebFetcher:
             case RetryStrategy.LINEAR:
                 return base_delay * (attempt + 1)
             case RetryStrategy.EXPONENTIAL:
-                return base_delay * (2**attempt)
+                return float(base_delay * (2**attempt))
             case _:
-                return base_delay
+                return base_delay  # type: ignore[unreachable]
 
     # Enhanced convenience methods
     async def fetch_with_circuit_breaker(self, request: FetchRequest) -> FetchResult:
         """Fetch a single URL with circuit breaker protection."""
-        return await with_circuit_breaker(
+        result: FetchResult = await with_circuit_breaker(
             url=str(request.url),
             func=self.fetch_single,
             config=self.circuit_breaker_config,
             request=request,
         )
+        return result
 
     async def fetch_with_auto_detection(
         self, url: str, headers: Optional[Dict[str, str]] = None
@@ -1012,7 +1015,7 @@ class WebFetcher:
         """
         # First fetch with RAW content type to get headers and content
         raw_request = FetchRequest(
-            url=url, headers=headers, content_type=ContentType.RAW
+            url=HttpUrl(url), headers=headers, content_type=ContentType.RAW
         )
 
         raw_result = await self.fetch_single(raw_request)
@@ -1023,14 +1026,18 @@ class WebFetcher:
         # Detect best content type
         if self._content_detector:
             try:
-                best_content_type = await self._content_detector.detect_content_type(
-                    raw_result.content, raw_result.headers, url
-                )
+                # Only detect content type if we have bytes content
+                if isinstance(raw_result.content, bytes):
+                    best_content_type, confidence = self._content_detector.detect_content_type(
+                        raw_result.content, url, raw_result.headers
+                    )
+                else:
+                    best_content_type = ContentType.RAW
 
                 # Re-parse with detected content type if different
                 if best_content_type != ContentType.RAW:
                     enhanced_request = FetchRequest(
-                        url=url, headers=headers, content_type=best_content_type
+                        url=HttpUrl(url), headers=headers, content_type=best_content_type
                     )
 
                     enhanced_result = await self.fetch_single(enhanced_request)

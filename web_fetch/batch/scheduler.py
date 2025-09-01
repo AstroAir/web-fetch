@@ -70,7 +70,7 @@ class BatchScheduler:
             if self._queue:
                 _, _, batch_request = heapq.heappop(self._queue)
                 logger.debug(f"Scheduled batch {batch_request.id} for processing")
-                return batch_request
+                return batch_request  # type: ignore[no-any-return]
 
             return None
 
@@ -246,7 +246,7 @@ class ResourceAwareScheduler(BatchScheduler):
 
                 # Check if batch fits resource constraints
                 if self._can_schedule_batch(batch_request):
-                    return batch_request
+                    return batch_request  # type: ignore[no-any-return]
                 else:
                     # Put back in queue for later
                     available_batches.append((priority, timestamp, batch_request))

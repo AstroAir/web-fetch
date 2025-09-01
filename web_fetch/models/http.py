@@ -309,7 +309,7 @@ class FetchResult(BaseResult):
 
     status_code: int = 0
     headers: Dict[str, str] = field(default_factory=dict)
-    content: Union[str, bytes, Dict[str, Any], None] = None
+    content: Union[str, bytes, Dict[str, Any], List[Any], None] = None
     content_type: ContentType = ContentType.RAW
 
     # Resource-specific metadata

@@ -266,8 +266,9 @@ class EnvironmentConfig(BaseModel):
                 security=SecurityConfig(verify_ssl=True),
                 performance=PerformanceConfig(max_concurrent_requests=20)
             )
-        else:
-            return GlobalConfig(
+        else:  # pragma: no cover
+            # Defensive programming - handle any future enum values
+            return GlobalConfig(  # type: ignore[unreachable]
                 environment=EnvironmentConfig(environment=environment)
             )
 

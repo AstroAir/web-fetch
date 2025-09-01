@@ -34,7 +34,7 @@ try:
     HAS_SKLEARN = True
 except ImportError:
     HAS_SKLEARN = False
-    np = None
+    np = None  # type: ignore
     TfidfVectorizer = None
 
 from ..models.base import ContentSummary

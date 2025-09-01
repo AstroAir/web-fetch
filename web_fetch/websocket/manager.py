@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, cast
 
 from .client import WebSocketClient
 from .models import WebSocketConfig, WebSocketConnectionState, WebSocketResult, WebSocketMessage
@@ -60,6 +60,9 @@ class WebSocketManager:
         self.max_connections = max_connections
         self._connections: Dict[str, WebSocketClient] = {}
         self._connection_tasks: Dict[str, asyncio.Task] = {}
+        # Alias for backward compatibility with tests
+        self._clients = self._connections
+        self._running = False
 
     async def add_connection(
         self, connection_id: str, config: WebSocketConfig
@@ -256,29 +259,31 @@ class WebSocketManager:
                 # Process completed tasks
                 for task in done:
                     # Find which connection this task belongs to
-                    connection_id: Optional[str] = None
+                    found_connection_id: Optional[str] = None
                     for cid, t in receive_tasks.items():
                         if t == task:
-                            connection_id = cid
+                            found_connection_id = cid
                             break
 
-                    if connection_id:
+                    if found_connection_id:
                         try:
                             message = await task
                             if message:
-                                yield connection_id, message
+                                yield found_connection_id, message
                         except Exception as e:
-                            logger.error(f"Error receiving from '{connection_id}': {e}")
+                            logger.error(f"Error receiving from '{found_connection_id}': {e}")
 
                         # Remove completed task and create new one if connection still active
-                        del receive_tasks[connection_id]
+                        del receive_tasks[found_connection_id]
 
-                        client = self._connections.get(connection_id)
-                        if client is not None and client.is_connected:
+                        maybe_client = self._connections.get(found_connection_id)
+                        if maybe_client is not None and maybe_client.is_connected:
+                            # Type guard: client is definitely not None here
+                            client = maybe_client  # Type narrowed by None check
                             new_task = asyncio.create_task(
                                 client.receive_message(timeout=1.0)
                             )
-                            receive_tasks[connection_id] = new_task
+                            receive_tasks[found_connection_id] = new_task
 
                 # Clean up disconnected connections
                 to_remove = []
@@ -342,6 +347,66 @@ class WebSocketManager:
             List of connection identifiers
         """
         return list(self._connections.keys())
+
+    async def add_client(self, client_id: str, config: WebSocketConfig) -> str:
+        """
+        Add a new WebSocket client to the manager.
+
+        Args:
+            client_id: Unique identifier for the client
+            config: WebSocket configuration
+
+        Returns:
+            The client ID
+
+        Raises:
+            ValueError: If client_id already exists or max connections exceeded
+        """
+        if client_id in self._connections:
+            raise ValueError(f"Client with ID '{client_id}' already exists")
+
+        if len(self._connections) >= self.max_connections:
+            raise ValueError(f"Maximum connections ({self.max_connections}) exceeded")
+
+        # Create new client
+        client = WebSocketClient(config)
+        self._connections[client_id] = client
+
+        logger.info(f"Added WebSocket client: {client_id}")
+        return client_id
+
+    async def remove_client(self, client_id: str) -> bool:
+        """
+        Remove a WebSocket client from the manager.
+
+        Args:
+            client_id: Unique identifier for the client
+
+        Returns:
+            True if client was removed, False if not found
+        """
+        if client_id not in self._connections:
+            return False
+
+        # Get the client and disconnect it
+        client = self._connections[client_id]
+        try:
+            await client.disconnect()
+        except Exception as e:
+            logger.warning(f"Error disconnecting client {client_id}: {e}")
+
+        # Remove from connections
+        del self._connections[client_id]
+
+        # Clean up any associated tasks
+        if client_id in self._connection_tasks:
+            task = self._connection_tasks[client_id]
+            if not task.done():
+                task.cancel()
+            del self._connection_tasks[client_id]
+
+        logger.info(f"Removed WebSocket client: {client_id}")
+        return True
 
     def get_connection(self, connection_id: str) -> Optional[WebSocketClient]:
         """

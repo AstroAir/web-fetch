@@ -95,10 +95,10 @@ class WebSocketClient:
         self._connection_state = WebSocketConnectionState.DISCONNECTED
 
         # Message handling
-        self._message_queue: asyncio.Queue = asyncio.Queue(
+        self._message_queue: asyncio.Queue[WebSocketMessage] = asyncio.Queue(
             maxsize=config.max_queue_size
         )
-        self._send_queue: asyncio.Queue = asyncio.Queue()
+        self._send_queue: asyncio.Queue[WebSocketMessage] = asyncio.Queue()
 
         # Tasks
         self._receive_task: Optional[asyncio.Task] = None
@@ -118,6 +118,17 @@ class WebSocketClient:
         self.on_message: Optional[Callable[[WebSocketMessage], None]] = None
         self.on_connect: Optional[Callable[[], None]] = None
         self.on_disconnect: Optional[Callable[[], None]] = None
+        self.on_error: Optional[Callable[[Exception], None]] = None
+
+    @property
+    def state(self) -> WebSocketConnectionState:
+        """Get the current connection state."""
+        return self._connection_state
+
+    @state.setter
+    def state(self, value: WebSocketConnectionState) -> None:
+        """Set the current connection state."""
+        self._connection_state = value
         self.on_error: Optional[Callable[[Exception], None]] = None
 
     async def __aenter__(self) -> WebSocketClient:
@@ -185,11 +196,13 @@ class WebSocketClient:
                 )
 
             # Connect to WebSocket
+            # Set compression to 15 (default) if enabled, None if disabled
+            compression = 15 if self.config.enable_compression else None
             self._websocket = await self._session.ws_connect(
                 str(self.config.url),
                 protocols=self.config.subprotocols,
                 headers=self.config.headers,
-                compress=self.config.enable_compression,
+                compress=compression,
                 max_msg_size=self.config.max_message_size,
                 timeout=self.config.connect_timeout,
                 heartbeat=(
@@ -220,7 +233,7 @@ class WebSocketClient:
             )
 
         except Exception as e:
-            self._connection_state = WebSocketConnectionState.ERROR
+            self._connection_state = WebSocketConnectionState.DISCONNECTED
             error_msg = f"Failed to connect to WebSocket: {str(e)}"
             logger.error(error_msg)
 
@@ -237,7 +250,11 @@ class WebSocketClient:
             ):
                 await self._schedule_reconnect()
 
-            raise WebSocketError(error_msg)
+            return WebSocketResult(
+                success=False,
+                connection_state=self._connection_state,
+                error=error_msg
+            )
 
     async def disconnect(self) -> WebSocketResult:
         """
@@ -327,6 +344,57 @@ class WebSocketClient:
 
         message = WebSocketMessage(type=WebSocketMessageType.BINARY, data=data)
         await self._send_queue.put(message)
+
+    async def send_message(self, message: WebSocketMessage) -> WebSocketResult:
+        """
+        Send a WebSocket message.
+
+        Args:
+            message: WebSocketMessage to send
+
+        Returns:
+            WebSocketResult with send status
+
+        Raises:
+            WebSocketError: If not connected or send fails
+        """
+        if not self.is_connected:
+            return WebSocketResult(
+                success=False,
+                connection_state=self._connection_state,
+                error="WebSocket is not connected"
+            )
+
+        try:
+            # Send the message directly to the websocket
+            if self._websocket:
+                serialized = message.serialize()
+                if message.type == WebSocketMessageType.BINARY:
+                    await self._websocket.send_bytes(serialized)
+                else:
+                    await self._websocket.send_str(str(serialized))
+
+                self._messages_sent += 1
+                self._bytes_sent += message.size
+
+                return WebSocketResult(
+                    success=True,
+                    connection_state=self._connection_state
+                )
+            else:
+                return WebSocketResult(
+                    success=False,
+                    connection_state=self._connection_state,
+                    error="WebSocket connection not available"
+                )
+        except Exception as e:
+            error_msg = f"Failed to send message: {str(e)}"
+            logger.error(error_msg)
+            return WebSocketResult(
+                success=False,
+                connection_state=self._connection_state,
+                error=error_msg
+            )
 
     async def receive_message(
         self, timeout: Optional[float] = None
@@ -466,9 +534,11 @@ class WebSocketClient:
                     )
 
                     if message.type == WebSocketMessageType.TEXT:
-                        await self._websocket.send_str(message.data)
+                        if isinstance(message.data, str):
+                            await self._websocket.send_str(message.data)
                     elif message.type == WebSocketMessageType.BINARY:
-                        await self._websocket.send_bytes(message.data)
+                        if isinstance(message.data, bytes):
+                            await self._websocket.send_bytes(message.data)
 
                     self._messages_sent += 1
                     self._bytes_sent += message.size

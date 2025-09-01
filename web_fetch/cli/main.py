@@ -564,7 +564,7 @@ async def main() -> None:
             else:
                 # Multiple URLs with crawler
                 results = await crawler_fetch_urls(
-                    urls,
+                    list(urls),
                     use_crawler=True,
                     crawler_type=crawler_type,
                     operation=CrawlerCapability(args.crawler_operation),

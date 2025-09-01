@@ -119,14 +119,14 @@ class TavilyCrawler(BaseCrawler):
 
         # Domain filtering
         if self.config.include_domains:
-            options["select_domains"] = [
+            options["select_domains"] = ",".join([
                 f"^{domain}$" for domain in self.config.include_domains
-            ]
+            ])
 
         if self.config.exclude_domains:
-            options["exclude_domains"] = [
+            options["exclude_domains"] = ",".join([
                 f"^{domain}$" for domain in self.config.exclude_domains
-            ]
+            ])
 
         return options
 

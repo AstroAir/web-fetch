@@ -226,10 +226,10 @@ class EnhancedContentParser:
                 case ContentType.XML:
                     return await self._parse_xml(content_bytes, url, result)
 
-                case _:
+                case _:  # pragma: no cover
                     # Fallback: parse as text to handle potential future enum values gracefully.
                     # Keep this branch reachable to satisfy static analyzers (e.g., mypy) and provide robustness.
-                    text_content = self._parse_text(content_bytes)
+                    text_content = self._parse_text(content_bytes)  # type: ignore[unreachable]
                     return text_content, result
 
         except Exception as e:
@@ -294,7 +294,7 @@ class EnhancedContentParser:
         try:
             text_content = content_bytes.decode("utf-8")
             soup = BeautifulSoup(text_content, "lxml")
-            
+
             # Extract links with proper type checking
             links = []
             for a in soup.find_all("a", href=True):
@@ -302,7 +302,7 @@ class EnhancedContentParser:
                     href = a.get("href")
                     if href:
                         links.append(href)
-            
+
             # Extract images with proper type checking
             images = []
             for img in soup.find_all("img", src=True):
@@ -310,7 +310,7 @@ class EnhancedContentParser:
                     src = img.get("src")
                     if src:
                         images.append(src)
-            
+
             return {
                 "title": soup.title.string if soup.title else None,
                 "text": soup.get_text(strip=True),

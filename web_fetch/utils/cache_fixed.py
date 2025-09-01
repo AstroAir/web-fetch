@@ -376,7 +376,7 @@ class FileCacheBackend(CacheBackendInterface):
                 async with aiofiles.open(cache_file, "rb") as f:
                     import pickle
 
-                    entry = pickle.loads(await f.read())
+                    entry: EnhancedCacheEntry = pickle.loads(await f.read())
 
                 if not entry.is_expired:
                     entry.hit_count += 1
@@ -469,7 +469,7 @@ class RedisCacheBackend(CacheBackendInterface):
         self._redis = None
         self._lock = asyncio.Lock()
 
-    async def _get_redis(self):
+    async def _get_redis(self) -> Any:
         """Get or create Redis connection."""
         if self._redis is None:
             try:
@@ -497,7 +497,7 @@ class RedisCacheBackend(CacheBackendInterface):
                 if data:
                     import pickle
 
-                    entry = pickle.loads(data)
+                    entry: EnhancedCacheEntry = pickle.loads(data)
 
                     if not entry.is_expired:
                         entry.hit_count += 1
@@ -513,6 +513,8 @@ class RedisCacheBackend(CacheBackendInterface):
                         # Remove expired entry
                         await redis.delete(redis_key)
                         return None
+                else:
+                    return None
 
             except Exception:
                 return None
@@ -582,10 +584,10 @@ class RedisCacheBackend(CacheBackendInterface):
             except Exception:
                 return 0
 
-    async def close(self):
+    async def close(self) -> None:
         """Close Redis connection."""
         if self._redis:
-            await self._redis.close()
+            await self._redis.close()  # type: ignore[unreachable]
 
 
 class EnhancedCache:

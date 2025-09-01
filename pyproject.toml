@@ -85,7 +85,8 @@ mcp = [
     "fastmcp>=0.2.0",           # MCP framework
     "websockets>=12.0",         # WebSocket support
     "gql>=3.4.0",               # GraphQL client
-    "aiohttp-graphql>=1.2.0",   # GraphQL server support
+    # aiohttp-graphql 1.2.0+ is not published (resolver error). Use latest available 1.1.x.
+    "aiohttp-graphql>=1.0.0,<1.2.0",   # GraphQL server support (relaxed)
     "authlib>=1.2.0",           # Enhanced authentication
     "python-jose[cryptography]>=3.3.0",  # JWT handling
     "jsonpath-ng>=1.6.0",       # JSON path extraction

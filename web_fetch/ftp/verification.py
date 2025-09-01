@@ -85,8 +85,8 @@ class FTPVerificationManager:
                     expected_checksums.get("sha256") if expected_checksums else None,
                 )
 
-            # Fallback for any future/unknown method values
-            return FTPVerificationResult(
+            # Fallback for any future/unknown method values  # pragma: no cover
+            return FTPVerificationResult(  # type: ignore[unreachable]
                 method=method,
                 expected_value=None,
                 actual_value=None,

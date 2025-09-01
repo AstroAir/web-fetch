@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from pydantic import Field, ConfigDict
 
@@ -303,7 +303,7 @@ class JWTAuth(AuthMethod):
             if exp is None:
                 return False
 
-            return time.time() >= exp
+            return time.time() >= float(exp)
         except Exception:
             return True
 
@@ -312,7 +312,8 @@ class JWTAuth(AuthMethod):
         try:
             parts = token.split(".")
             payload = json.loads(self._base64url_decode(parts[1]))
-            return payload.get("exp")
+            exp = payload.get("exp")
+            return float(exp) if exp is not None else None
         except Exception:
             return None
 
@@ -333,7 +334,7 @@ class JWTAuth(AuthMethod):
         try:
             parts = token.split(".")
             payload = json.loads(self._base64url_decode(parts[1]))
-            return payload
+            return cast(Dict[str, Any], payload) if isinstance(payload, dict) else {}
         except Exception:
             return {}
 

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import HttpUrl
+
 from .models.base import ContentType
 
 # Enhanced convenience functions
@@ -77,7 +79,7 @@ async def enhanced_fetch_url(
         FetchResult with response data and metadata
     """
     request = FetchRequest(
-        url=url,  # Pydantic will convert string to HttpUrl
+        url=HttpUrl(url),
         method=method,
         headers=headers,
         data=data,
@@ -132,7 +134,7 @@ async def enhanced_fetch_urls(
     from .models.http import BatchFetchRequest
 
     requests = [
-        FetchRequest(url=url, method=method, headers=headers, content_type=content_type)
+        FetchRequest(url=HttpUrl(url), method=method, headers=headers, content_type=content_type)
         for url in urls
     ]
 

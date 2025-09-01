@@ -121,7 +121,7 @@ class CSVParser:
                 # Fallback to comma
                 dialect.delimiter = ","
 
-            return dialect
+            return dialect  # type: ignore
 
         except Exception:
             # Create a default dialect
@@ -157,7 +157,7 @@ class CSVParser:
             # Create metadata
             metadata = CSVMetadata()
             metadata.delimiter = dialect.delimiter
-            metadata.quotechar = dialect.quotechar
+            metadata.quotechar = dialect.quotechar or '"'
             metadata.encoding = encoding
             metadata.has_header = True  # pandas assumes header by default
             metadata.row_count = len(df)
@@ -229,7 +229,7 @@ class CSVParser:
         # Create metadata
         metadata = CSVMetadata()
         metadata.delimiter = dialect.delimiter
-        metadata.quotechar = dialect.quotechar
+        metadata.quotechar = dialect.quotechar or '"'
         metadata.encoding = encoding
         metadata.has_header = has_header
         metadata.row_count = len(data_rows)

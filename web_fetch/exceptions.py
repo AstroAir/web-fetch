@@ -420,7 +420,7 @@ class ErrorHandler:
 
         # Exponential backoff for most retryable errors
         if ErrorHandler.is_retryable_error(error):
-            return base_delay * (2**attempt)
+            return float(base_delay * (2**attempt))
 
         return 0.0
 

@@ -205,7 +205,8 @@ async def download_file(
     )
 
     async with StreamingWebFetcher(config) as streaming_fetcher:
-        return await streaming_fetcher.stream_fetch(request, progress_callback)
+        result: StreamResult = await streaming_fetcher.stream_fetch(request, progress_callback)
+        return result
 
 
 async def fetch_with_cache(

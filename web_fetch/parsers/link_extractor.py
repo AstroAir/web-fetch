@@ -417,7 +417,7 @@ class LinkExtractor:
 
     def categorize_links(self, links: List[LinkInfo]) -> Dict[str, List[LinkInfo]]:
         """Categorize links by type and other criteria."""
-        categories = {
+        categories: Dict[str, List[LinkInfo]] = {
             "internal": [],
             "external": [],
             "media": [],
@@ -458,7 +458,7 @@ class LinkExtractor:
         categories = self.categorize_links(links)
 
         # Domain analysis
-        domains = {}
+        domains: Dict[str, int] = {}
         for link in links:
             parsed = urlparse(link.url)
             domain = parsed.netloc
@@ -466,7 +466,7 @@ class LinkExtractor:
                 domains[domain] = domains.get(domain, 0) + 1
 
         # Protocol analysis
-        protocols = {}
+        protocols: Dict[str, int] = {}
         for link in links:
             parsed = urlparse(link.url)
             protocol = parsed.scheme

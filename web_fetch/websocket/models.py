@@ -6,12 +6,14 @@ This module defines the data models and enums used for WebSocket communication.
 
 from __future__ import annotations
 
+import json
 import time
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict, HttpUrl
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl, field_validator
 
 from ..exceptions import WebFetchError
 
@@ -27,6 +29,7 @@ class WebSocketMessageType(str, Enum):
 
     TEXT = "text"
     BINARY = "binary"
+    JSON = "json"
     PING = "ping"
     PONG = "pong"
     CLOSE = "close"
@@ -52,6 +55,7 @@ class WebSocketMessage:
     data: Union[str, bytes, None] = None
     timestamp: float = field(default_factory=time.time)
     size: int = 0
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def __post_init__(self) -> None:
         """Calculate message size after initialization."""
@@ -60,6 +64,26 @@ class WebSocketMessage:
                 self.size = len(self.data.encode("utf-8"))
             elif isinstance(self.data, bytes):
                 self.size = len(self.data)
+
+    def serialize(self) -> Union[str, bytes]:
+        """Serialize the message for transmission."""
+        if self.type == WebSocketMessageType.JSON:
+            # For JSON messages, serialize just the data as JSON string
+            return json.dumps(self.data)
+        elif self.type == WebSocketMessageType.TEXT:
+            # For text messages, return the data as string
+            return str(self.data) if self.data is not None else ""
+        elif self.type == WebSocketMessageType.BINARY:
+            # For binary messages, return the data as bytes
+            if isinstance(self.data, bytes):
+                return self.data
+            elif isinstance(self.data, str):
+                return self.data.encode("utf-8")
+            else:
+                return b""
+        else:
+            # For other message types, return as string
+            return str(self.data) if self.data is not None else ""
 
 
 @dataclass
@@ -91,7 +115,7 @@ class WebSocketConfig(BaseModel):
     """Configuration for WebSocket connections."""
 
     # Connection settings
-    url: HttpUrl = Field(description="WebSocket URL (ws:// or wss://)")
+    url: str = Field(description="WebSocket URL (ws:// or wss://)")
     subprotocols: List[str] = Field(
         default_factory=list, description="WebSocket subprotocols"
     )
@@ -101,7 +125,7 @@ class WebSocketConfig(BaseModel):
 
     # Timeout settings
     connect_timeout: float = Field(
-        default=30.0, ge=1.0, description="Connection timeout in seconds"
+        default=10.0, ge=1.0, description="Connection timeout in seconds"
     )
     ping_timeout: float = Field(
         default=20.0, ge=1.0, description="Ping timeout in seconds"
@@ -139,6 +163,9 @@ class WebSocketConfig(BaseModel):
     ping_interval: float = Field(
         default=30.0, ge=1.0, description="Ping interval in seconds"
     )
+    heartbeat_interval: float = Field(
+        default=30.0, ge=1.0, description="Heartbeat interval in seconds"
+    )
     enable_ping: bool = Field(default=True, description="Enable automatic ping/pong")
 
     # SSL settings
@@ -150,5 +177,17 @@ class WebSocketConfig(BaseModel):
     enable_compression: bool = Field(
         default=True, description="Enable per-message deflate compression"
     )
+
+    @field_validator('url')
+    @classmethod
+    def validate_websocket_url(cls, v: str) -> str:
+        """Validate that the URL uses WebSocket scheme."""
+        if not isinstance(v, str):
+            raise ValueError("URL must be a string")
+
+        if not (v.startswith('ws://') or v.startswith('wss://')):
+            raise ValueError("URL must use ws:// or wss:// scheme")
+
+        return v
 
     model_config = ConfigDict(use_enum_values=True)

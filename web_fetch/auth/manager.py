@@ -76,7 +76,7 @@ class AuthManager:
         ```
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the authentication manager."""
         self._auth_methods: Dict[str, AuthMethod] = {}
         self._default_method: Optional[str] = None
@@ -320,24 +320,25 @@ class AuthManager:
         for name, method_config in methods_config.items():
             auth_type = method_config.get("type")
 
+            auth_method: AuthMethod
             if auth_type == "api_key":
                 auth_config = APIKeyConfig(**method_config)
                 auth_method = APIKeyAuth(auth_config)
             elif auth_type == "oauth2":
-                auth_config = OAuth2Config(**method_config)
-                auth_method = OAuth2Auth(auth_config)
+                oauth_config = OAuth2Config(**method_config)
+                auth_method = OAuth2Auth(oauth_config)
             elif auth_type == "jwt":
-                auth_config = JWTConfig(**method_config)
-                auth_method = JWTAuth(auth_config)
+                jwt_config = JWTConfig(**method_config)
+                auth_method = JWTAuth(jwt_config)
             elif auth_type == "basic":
-                auth_config = BasicAuthConfig(**method_config)
-                auth_method = BasicAuth(auth_config)
+                basic_config = BasicAuthConfig(**method_config)
+                auth_method = BasicAuth(basic_config)
             elif auth_type == "bearer":
-                auth_config = BearerTokenConfig(**method_config)
-                auth_method = BearerTokenAuth(auth_config)
+                bearer_config = BearerTokenConfig(**method_config)
+                auth_method = BearerTokenAuth(bearer_config)
             elif auth_type == "custom":
-                auth_config = CustomAuthConfig(**method_config)
-                auth_method = CustomAuth(auth_config)
+                custom_config = CustomAuthConfig(**method_config)
+                auth_method = CustomAuth(custom_config)
             else:
                 raise AuthenticationError(
                     f"Unsupported authentication type: {auth_type}"
