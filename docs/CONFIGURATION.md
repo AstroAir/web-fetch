@@ -1,6 +1,7 @@
 # Configuration Guide
 
-This document provides comprehensive information about configuring the web-fetch library, including environment variables, configuration files, and setup requirements.
+!!! warning "Moved"
+    This file has been moved to [user-guide/configuration.md](user-guide/configuration.md). Please update your bookmarks.
 
 ## Table of Contents
 

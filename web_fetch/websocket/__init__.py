@@ -5,14 +5,22 @@ This module provides WebSocket client capabilities for real-time communication
 and streaming data with comprehensive connection management and message handling.
 """
 
-from .client import WebSocketClient, WebSocketConfig
+from .client import WebSocketClient
 from .manager import WebSocketManager
-from .models import (
+from .exceptions import WebSocketError
+from .core_models import (
+    WebSocketConfig,
     WebSocketConnectionState,
-    WebSocketError,
     WebSocketMessage,
     WebSocketMessageType,
     WebSocketResult,
+    create_message,
+)
+from .optimization import (
+    get_message_pool_statistics,
+    get_global_profiler,
+    AdaptiveQueue,
+    WebSocketProfiler,
 )
 
 __all__ = [
@@ -27,4 +35,10 @@ __all__ = [
     "WebSocketError",
     # Manager
     "WebSocketManager",
+    # Optimization features
+    "create_message",
+    "get_message_pool_statistics",
+    "get_global_profiler",
+    "AdaptiveQueue",
+    "WebSocketProfiler",
 ]

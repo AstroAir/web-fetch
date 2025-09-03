@@ -12,7 +12,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, TypeAlias
 
 # Import formatting utilities
 from .formatting import Formatter, create_formatter, print_banner, print_help_footer
@@ -31,7 +31,7 @@ try:
     PYDANTIC_AVAILABLE = True
 except ImportError:
     PYDANTIC_AVAILABLE = False
-    HttpUrl = str
+    HttpUrl: TypeAlias = str
 
 try:
     from .. import (  # Crawler functionality

@@ -11,14 +11,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import Field, ConfigDict
 
-from ..exceptions import WebFetchError
-from .base import AuthConfig, AuthLocation, AuthMethod, AuthResult, AuthType
-
-
-class AuthenticationError(WebFetchError):
-    """Authentication-specific error."""
-
-    pass
+from .base import AuthConfig, AuthLocation, AuthMethod, AuthResult, AuthType, AuthenticationError
 
 
 class APIKeyConfig(AuthConfig):

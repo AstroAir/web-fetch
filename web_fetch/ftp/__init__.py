@@ -32,6 +32,51 @@ from .models import (
     FTPVerificationResult,
 )
 
+# Performance optimization modules
+from .metrics import (
+    get_metrics_collector,
+    reset_global_metrics,
+    FTPMetricsCollector,
+    TransferMetrics,
+    ConnectionPoolMetrics,
+    PerformanceSnapshot,
+)
+from .profiler import (
+    get_profiler,
+    profile,
+    FTPProfiler,
+    ProfileResult,
+)
+from .circuit_breaker import (
+    get_circuit_breaker,
+    reset_circuit_breaker,
+    FTPCircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerState,
+    CircuitBreakerError,
+)
+from .retry import (
+    get_retry_manager,
+    reset_retry_manager,
+    FTPRetryManager,
+    RetryConfig,
+    RetryStrategy,
+    RetryableError,
+    NonRetryableError,
+)
+from .config_presets import (
+    FTPConfigPresets,
+    OptimizedPreset,
+    UseCase,
+)
+from .monitoring import (
+    get_monitor,
+    reset_monitor,
+    FTPMonitor,
+    PerformanceReport,
+    OptimizationRecommendation,
+)
+
 __all__ = [
     # Main FTP client
     "FTPFetcher",
@@ -55,4 +100,48 @@ __all__ = [
     "FTPAuthType",
     "FTPTransferMode",
     "FTPVerificationMethod",
+
+    # Performance optimization modules
+    # Metrics and monitoring
+    "get_metrics_collector",
+    "reset_global_metrics",
+    "FTPMetricsCollector",
+    "TransferMetrics",
+    "ConnectionPoolMetrics",
+    "PerformanceSnapshot",
+
+    # Profiling
+    "get_profiler",
+    "profile",
+    "FTPProfiler",
+    "ProfileResult",
+
+    # Circuit breaker
+    "get_circuit_breaker",
+    "reset_circuit_breaker",
+    "FTPCircuitBreaker",
+    "CircuitBreakerConfig",
+    "CircuitBreakerState",
+    "CircuitBreakerError",
+
+    # Retry mechanisms
+    "get_retry_manager",
+    "reset_retry_manager",
+    "FTPRetryManager",
+    "RetryConfig",
+    "RetryStrategy",
+    "RetryableError",
+    "NonRetryableError",
+
+    # Configuration presets
+    "FTPConfigPresets",
+    "OptimizedPreset",
+    "UseCase",
+
+    # Comprehensive monitoring
+    "get_monitor",
+    "reset_monitor",
+    "FTPMonitor",
+    "PerformanceReport",
+    "OptimizationRecommendation",
 ]

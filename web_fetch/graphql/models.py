@@ -17,9 +17,105 @@ from ..exceptions import WebFetchError
 
 
 class GraphQLError(WebFetchError):
-    """GraphQL-specific error."""
+    """Base GraphQL-specific error."""
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        query: Optional[str] = None,
+        variables: Optional[Dict[str, Any]] = None,
+        path: Optional[List[Union[str, int]]] = None,
+        extensions: Optional[Dict[str, Any]] = None,
+        original_error: Optional[Exception] = None,
+    ):
+        """
+        Initialize GraphQL error.
+
+        Args:
+            message: Error message
+            query: GraphQL query that caused the error
+            variables: Variables used in the query
+            path: Path to the field that caused the error
+            extensions: Additional error information
+            original_error: Original exception that caused this error
+        """
+        super().__init__(message)
+        self.query = query
+        self.variables = variables
+        self.path = path
+        self.extensions = extensions
+        self.original_error = original_error
+
+
+class GraphQLValidationError(GraphQLError):
+    """GraphQL query validation error."""
+
+    def __init__(
+        self,
+        message: str,
+        validation_errors: Optional[List[str]] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, **kwargs)
+        self.validation_errors = validation_errors or []
+
+
+class GraphQLExecutionError(GraphQLError):
+    """GraphQL query execution error."""
+
+    def __init__(
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        response_data: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, **kwargs)
+        self.status_code = status_code
+        self.response_data = response_data
+
+
+class GraphQLNetworkError(GraphQLError):
+    """GraphQL network-related error."""
+
+    def __init__(
+        self,
+        message: str,
+        endpoint: Optional[str] = None,
+        retry_after: Optional[float] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, **kwargs)
+        self.endpoint = endpoint
+        self.retry_after = retry_after
+
+
+class GraphQLTimeoutError(GraphQLError):
+    """GraphQL request timeout error."""
+
+    def __init__(
+        self,
+        message: str,
+        timeout_duration: Optional[float] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, **kwargs)
+        self.timeout_duration = timeout_duration
+
+
+class GraphQLRateLimitError(GraphQLError):
+    """GraphQL rate limit error."""
+
+    def __init__(
+        self,
+        message: str,
+        retry_after: Optional[float] = None,
+        limit_type: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, **kwargs)
+        self.retry_after = retry_after
+        self.limit_type = limit_type
 
 
 class GraphQLOperationType(str, Enum):

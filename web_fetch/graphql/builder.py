@@ -8,6 +8,9 @@ and subscriptions programmatically.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
+import weakref
+from collections import deque
+from functools import lru_cache
 
 from .models import (
     GraphQLMutation,
@@ -19,7 +22,7 @@ from .models import (
 
 
 class FieldBuilder:
-    """Builder for GraphQL fields."""
+    """Builder for GraphQL fields with memory optimization."""
 
     def __init__(
         self,
@@ -36,11 +39,22 @@ class FieldBuilder:
             parent: Parent builder (QueryBuilder, FieldBuilder, or FragmentBuilder)
         """
         self.name = name
-        self.parent = parent
+        # Use weak reference to parent to prevent circular references
+        self._parent_ref = weakref.ref(parent) if parent is not None else None
         self.arguments: Dict[str, Any] = {}
         self.alias: Optional[str] = None
         self.sub_fields: List[FieldBuilder] = []
         self.directives: List[Dict[str, Any]] = []
+        # Lazy evaluation cache
+        self._cached_string: Optional[str] = None
+        self._string_dirty = True
+
+    @property
+    def parent(self) -> Optional[Union["QueryBuilder", "FieldBuilder", "FragmentBuilder"]]:
+        """Get parent builder, handling weak reference."""
+        if self._parent_ref is not None:
+            return self._parent_ref()
+        return None
 
     def arg(self, name: str, value: Any) -> FieldBuilder:
         """
@@ -54,7 +68,19 @@ class FieldBuilder:
             Self for chaining
         """
         self.arguments[name] = value
+        self._invalidate_cache()
         return self
+
+    def _invalidate_cache(self) -> None:
+        """Invalidate cached string representation."""
+        self._string_dirty = True
+        self._cached_string = None
+        if hasattr(self, '_cached_strings'):
+            self._cached_strings.clear()
+        # Invalidate parent cache as well
+        parent = self.parent
+        if parent and hasattr(parent, '_invalidate_cache'):
+            parent._invalidate_cache()
 
     def args(self, **kwargs: Any) -> FieldBuilder:
         """
@@ -67,6 +93,7 @@ class FieldBuilder:
             Self for chaining
         """
         self.arguments.update(kwargs)
+        self._invalidate_cache()
         return self
 
     def as_alias(self, alias: str) -> FieldBuilder:
@@ -80,6 +107,7 @@ class FieldBuilder:
             Self for chaining
         """
         self.alias = alias
+        self._invalidate_cache()
         return self
 
     def field(self, name: str) -> FieldBuilder:
@@ -94,6 +122,7 @@ class FieldBuilder:
         """
         sub_field = FieldBuilder(name, parent=self)
         self.sub_fields.append(sub_field)
+        self._invalidate_cache()
         return sub_field
 
     def add_fields(self, *names: str) -> FieldBuilder:
@@ -108,6 +137,7 @@ class FieldBuilder:
         """
         for name in names:
             self.sub_fields.append(FieldBuilder(name, parent=self))
+        self._invalidate_cache()
         return self
 
     def end(self) -> Union["QueryBuilder", "FieldBuilder", "FragmentBuilder"]:
@@ -133,11 +163,12 @@ class FieldBuilder:
             Self for chaining
         """
         self.directives.append({"name": name, "args": args})
+        self._invalidate_cache()
         return self
 
     def to_string(self, indent: int = 0) -> str:
         """
-        Convert field to GraphQL string.
+        Convert field to GraphQL string with lazy evaluation.
 
         Args:
             indent: Indentation level
@@ -145,6 +176,12 @@ class FieldBuilder:
         Returns:
             GraphQL field string
         """
+        # Use cached string if available and not dirty
+        cache_key = f"indent_{indent}"
+        if not self._string_dirty and self._cached_string and cache_key in getattr(self, '_cached_strings', {}):
+            return getattr(self, '_cached_strings')[cache_key]
+
+        # Build string
         spaces = "  " * indent
         result = spaces
 
@@ -183,6 +220,12 @@ class FieldBuilder:
             for sub_field in self.sub_fields:
                 result += sub_field.to_string(indent + 1) + "\n"
             result += spaces + "}"
+
+        # Cache the result
+        if not hasattr(self, '_cached_strings'):
+            self._cached_strings = {}
+        self._cached_strings[cache_key] = result
+        self._string_dirty = False
 
         return result
 
@@ -404,8 +447,9 @@ class QueryBuilder:
         )
 
     def _build_query_string(self) -> str:
-        """Build the query string."""
-        lines = []
+        """Build the query string with memory-efficient string building."""
+        # Use deque for efficient string building
+        lines = deque()
 
         # Add operation definition
         operation_line = "query"

@@ -34,8 +34,8 @@ class CircuitBreakerConfig:
     timeout: float = 30.0  # Request timeout in seconds
 
     # What constitutes a failure
-    failure_exceptions: tuple = (Exception,)
-    failure_status_codes: set = field(default_factory=lambda: {500, 502, 503, 504})
+    failure_exceptions: tuple[type[Exception], ...] = (Exception,)
+    failure_status_codes: set[int] = field(default_factory=lambda: {500, 502, 503, 504})
 
 
 @dataclass

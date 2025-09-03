@@ -8,13 +8,14 @@ resumable downloads, progress tracking, and integrity verification.
 import hashlib
 import time
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import aiofiles
 import aiohttp
 from pydantic import BaseModel, Field
 
 from ..models import ProgressInfo
+from .connection_pool import OptimizedConnectionPool, ConnectionPoolConfig
 
 
 class DownloadConfig(BaseModel):
@@ -60,30 +61,49 @@ class DownloadResult(BaseModel):
 
 
 class DownloadHandler:
-    """Handler for file downloads."""
+    """Handler for file downloads with optimized connection pooling."""
 
-    def __init__(self, config: Optional[DownloadConfig] = None):
+    def __init__(
+        self,
+        config: Optional[DownloadConfig] = None,
+        connection_pool: Optional[OptimizedConnectionPool] = None
+    ):
         """
         Initialize download handler.
 
         Args:
             config: Download configuration
+            connection_pool: Optional connection pool for reuse
         """
         self.config = config or DownloadConfig()
+        self._connection_pool = connection_pool
+        self._owned_pool = connection_pool is None
+
+    async def _get_connection_pool(self) -> OptimizedConnectionPool:
+        """Get or create connection pool."""
+        if self._connection_pool is None:
+            pool_config = ConnectionPoolConfig(
+                total_connections=50,
+                connections_per_host=10,
+                keepalive_timeout=60,  # Longer keepalive for downloads
+                enable_cleanup_closed=True,
+            )
+            self._connection_pool = OptimizedConnectionPool(pool_config)
+        return self._connection_pool
 
     async def download_file(
         self,
-        session: aiohttp.ClientSession,
+        session: Optional[aiohttp.ClientSession],
         url: str,
         output_path: Union[str, Path],
-        headers: Optional[dict] = None,
+        headers: Optional[Dict[str, str]] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> DownloadResult:
         """
-        Download a file from URL.
+        Download a file from URL with optimized connection pooling.
 
         Args:
-            session: aiohttp session
+            session: Optional aiohttp session (will create optimized one if None)
             url: Download URL
             output_path: Output file path
             headers: Request headers
@@ -105,6 +125,31 @@ class DownloadHandler:
                 error="File already exists and overwrite is disabled",
             )
 
+        # Use optimized connection pool if no session provided
+        if session is None:
+            pool = await self._get_connection_pool()
+            async with pool.get_session() as optimized_session:
+                return await self._download_with_session(
+                    optimized_session, url, output_path, temp_path,
+                    headers, progress_callback
+                )
+        else:
+            return await self._download_with_session(
+                session, url, output_path, temp_path,
+                headers, progress_callback
+            )
+
+    async def _download_with_session(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        output_path: Path,
+        temp_path: Path,
+        headers: Optional[Dict[str, str]],
+        progress_callback: Optional[Callable[[ProgressInfo], None]],
+    ) -> DownloadResult:
+
+        """Core download logic with memory-efficient streaming."""
         # Create parent directories
         if self.config.create_directories:
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,6 +164,9 @@ class DownloadHandler:
         )
 
         try:
+            # Use optimized chunk size for better memory efficiency
+            optimized_chunk_size = min(self.config.chunk_size, 64 * 1024)  # Max 64KB chunks
+
             async with session.get(url, headers=headers) as response:
                 response.raise_for_status()
 
@@ -138,12 +186,13 @@ class DownloadHandler:
                             error=f"File size {total_bytes} exceeds limit {self.config.max_file_size}",
                         )
 
-                # Download file
+                # Memory-efficient streaming download
                 async with aiofiles.open(temp_path, "wb") as f:
-                    async for chunk in response.content.iter_chunked(
-                        self.config.chunk_size
-                    ):
-                        await f.write(chunk)
+                    # Use buffered writing for better performance
+                    write_buffer = bytearray()
+                    buffer_size = optimized_chunk_size * 4  # 4x chunk size buffer
+
+                    async for chunk in response.content.iter_chunked(optimized_chunk_size):
                         bytes_downloaded += len(chunk)
 
                         # Update checksum
@@ -162,8 +211,14 @@ class DownloadHandler:
                                 error=f"Downloaded size {bytes_downloaded} exceeds limit {self.config.max_file_size}",
                             )
 
-                        # Progress callback
-                        if progress_callback:
+                        # Buffer writes for efficiency
+                        write_buffer.extend(chunk)
+                        if len(write_buffer) >= buffer_size:
+                            await f.write(write_buffer)
+                            write_buffer.clear()
+
+                        # Progress callback (throttled for performance)
+                        if progress_callback and bytes_downloaded % (optimized_chunk_size * 10) == 0:
                             elapsed = max(time.time() - start_time, 1e-9)
                             percentage = (
                                 (bytes_downloaded / total_bytes * 100)
@@ -176,6 +231,11 @@ class DownloadHandler:
                                 percentage=percentage,
                             )
                             progress_callback(progress)
+
+                    # Flush remaining buffer
+                    if write_buffer:
+                        await f.write(write_buffer)
+                        write_buffer.clear()
 
             # Verify checksum if required and possible
             if self.config.verify_checksum and self.config.expected_checksum and hasher is not None:
@@ -216,6 +276,20 @@ class DownloadHandler:
                 error=str(e),
             )
 
+    async def close(self) -> None:
+        """Close connection pool if owned by this handler."""
+        if self._owned_pool and self._connection_pool:
+            await self._connection_pool.close()
+            self._connection_pool = None
+
+    async def __aenter__(self) -> 'DownloadHandler':
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Async context manager exit."""
+        await self.close()
+
 
 class ResumableDownloadHandler(DownloadHandler):
     """Handler for resumable downloads."""
@@ -225,7 +299,7 @@ class ResumableDownloadHandler(DownloadHandler):
         session: aiohttp.ClientSession,
         url: str,
         output_path: Union[str, Path],
-        headers: Optional[dict] = None,
+        headers: Optional[Dict[str, str]] = None,
         progress_callback: Optional[Callable[[ProgressInfo], None]] = None,
     ) -> DownloadResult:
         """
@@ -368,8 +442,8 @@ class ResumableDownloadHandler(DownloadHandler):
             )
 
     async def get_download_info(
-        self, session: aiohttp.ClientSession, url: str, headers: Optional[dict] = None
-    ) -> dict:
+        self, session: aiohttp.ClientSession, url: str, headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """
         Get download information without downloading.
 

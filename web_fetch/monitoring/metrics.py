@@ -283,7 +283,7 @@ class PrometheusMetricsBackend(MetricsBackendInterface):
 class ConsoleMetricsBackend(MetricsBackendInterface):
     """Console metrics backend for debugging."""
 
-    def __init__(self, print_func: Callable = print):
+    def __init__(self, print_func: Callable[..., None] = print):
         """
         Initialize console metrics backend.
 

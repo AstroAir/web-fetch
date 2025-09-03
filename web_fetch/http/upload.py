@@ -10,13 +10,14 @@ import hashlib
 import mimetypes
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Union
 
 import aiofiles
 import aiohttp
 from pydantic import BaseModel, Field
 
 from ..exceptions import WebFetchError
+from .connection_pool import OptimizedConnectionPool, ConnectionPoolConfig
 
 
 class UploadFile(BaseModel):
@@ -51,15 +52,39 @@ class UploadProgress(BaseModel):
 
 
 class FileUploadHandler:
-    """Handler for file uploads."""
+    """Handler for file uploads with optimized connection pooling."""
 
-    def __init__(self) -> None:
-        """Initialize file upload handler."""
-        pass
+    def __init__(
+        self,
+        connection_pool: Optional[OptimizedConnectionPool] = None,
+        chunk_size: int = 64 * 1024  # 64KB chunks for memory efficiency
+    ) -> None:
+        """
+        Initialize file upload handler.
+
+        Args:
+            connection_pool: Optional connection pool for reuse
+            chunk_size: Upload chunk size for streaming
+        """
+        self._connection_pool = connection_pool
+        self._owned_pool = connection_pool is None
+        self.chunk_size = chunk_size
+
+    async def _get_connection_pool(self) -> OptimizedConnectionPool:
+        """Get or create connection pool."""
+        if self._connection_pool is None:
+            pool_config = ConnectionPoolConfig(
+                total_connections=30,
+                connections_per_host=8,
+                keepalive_timeout=60,  # Longer keepalive for uploads
+                enable_cleanup_closed=True,
+            )
+            self._connection_pool = OptimizedConnectionPool(pool_config)
+        return self._connection_pool
 
     async def upload_file(
         self,
-        session: aiohttp.ClientSession,
+        session: Optional[aiohttp.ClientSession],
         url: str,
         file_config: UploadFile,
         headers: Optional[Dict[str, str]] = None,
@@ -67,10 +92,10 @@ class FileUploadHandler:
         progress_callback: Optional[Callable[[UploadProgress], None]] = None,
     ) -> aiohttp.ClientResponse:
         """
-        Upload a single file.
+        Upload a single file with optimized connection pooling.
 
         Args:
-            session: aiohttp session
+            session: Optional aiohttp session (will create optimized one if None)
             url: Upload URL
             file_config: File upload configuration
             headers: Additional headers
@@ -83,6 +108,28 @@ class FileUploadHandler:
         Raises:
             WebFetchError: If upload fails
         """
+        # Use optimized connection pool if no session provided
+        if session is None:
+            pool = await self._get_connection_pool()
+            async with pool.get_session() as optimized_session:
+                return await self._upload_with_session(
+                    optimized_session, url, file_config, headers, form_data, progress_callback
+                )
+        else:
+            return await self._upload_with_session(
+                session, url, file_config, headers, form_data, progress_callback
+            )
+
+    async def _upload_with_session(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        file_config: UploadFile,
+        headers: Optional[Dict[str, str]],
+        form_data: Optional[Dict[str, Any]],
+        progress_callback: Optional[Callable[[UploadProgress], None]],
+    ) -> aiohttp.ClientResponse:
+        """Core upload logic with memory-efficient streaming."""
         file_path = Path(file_config.path)
 
         if not file_path.exists():
@@ -111,13 +158,30 @@ class FileUploadHandler:
             for key, value in form_data.items():
                 form.add_field(key, str(value))
 
-        # Add file with progress tracking
-        async with aiofiles.open(file_path, "rb") as f:
-            file_content = await f.read()
+        # Memory-efficient file streaming
+        async def file_sender() -> AsyncGenerator[bytes, None]:
+            """Generator for streaming file upload with progress tracking."""
+            bytes_uploaded = 0
+            async with aiofiles.open(file_path, "rb") as f:
+                while True:
+                    chunk = await f.read(self.chunk_size)
+                    if not chunk:
+                        break
 
+                    bytes_uploaded += len(chunk)
+
+                    # Update progress
+                    if progress_callback:
+                        progress.bytes_uploaded = bytes_uploaded
+                        progress.percentage = (bytes_uploaded / file_size * 100) if file_size > 0 else 0
+                        progress_callback(progress)
+
+                    yield chunk
+
+        # Add file with streaming
         form.add_field(
             file_config.field_name,
-            file_content,
+            file_sender(),
             filename=filename,
             content_type=content_type,
         )
@@ -139,6 +203,20 @@ class FileUploadHandler:
 
         except Exception as e:
             raise WebFetchError(f"Upload failed: {e}")
+
+    async def close(self) -> None:
+        """Close connection pool if owned by this handler."""
+        if self._owned_pool and self._connection_pool:
+            await self._connection_pool.close()
+            self._connection_pool = None
+
+    async def __aenter__(self) -> 'FileUploadHandler':
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Async context manager exit."""
+        await self.close()
 
     async def upload_multiple_files(
         self,

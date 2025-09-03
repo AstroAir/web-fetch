@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, cast
 
 from .client import WebSocketClient
-from .models import WebSocketConfig, WebSocketConnectionState, WebSocketResult, WebSocketMessage
+from .core_models import WebSocketConfig, WebSocketConnectionState, WebSocketResult, WebSocketMessage
 
 logger = logging.getLogger(__name__)
 
@@ -50,19 +51,38 @@ class WebSocketManager:
         ```
     """
 
-    def __init__(self, max_connections: int = 100):
+    def __init__(self, max_connections: int = 100, cleanup_interval: float = 60.0,
+                 health_check_interval: float = 30.0):
         """
         Initialize WebSocket manager.
 
         Args:
             max_connections: Maximum number of concurrent connections
+            cleanup_interval: Interval in seconds for proactive cleanup
+            health_check_interval: Interval in seconds for health checks
         """
         self.max_connections = max_connections
+        self.cleanup_interval = cleanup_interval
+        self.health_check_interval = health_check_interval
+
         self._connections: Dict[str, WebSocketClient] = {}
-        self._connection_tasks: Dict[str, asyncio.Task] = {}
+        self._connection_tasks: Dict[str, asyncio.Task[Any]] = {}
+        self._connection_metadata: Dict[str, Dict[str, Any]] = {}
+
         # Alias for backward compatibility with tests
         self._clients = self._connections
         self._running = False
+
+        # Cleanup and monitoring tasks
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
+        self._health_monitor_task: Optional[asyncio.Task[None]] = None
+        self._last_cleanup_time: float = time.time()
+        self._last_health_check_time: float = time.time()
+
+        # Statistics
+        self._total_connections_created: int = 0
+        self._total_connections_cleaned: int = 0
+        self._unhealthy_connections_removed: int = 0
 
     async def add_connection(
         self, connection_id: str, config: WebSocketConfig
@@ -92,7 +112,19 @@ class WebSocketManager:
 
             if result.success:
                 self._connections[connection_id] = client
+                self._connection_metadata[connection_id] = {
+                    "created_at": time.time(),
+                    "last_activity": time.time(),
+                    "config": config,
+                    "health_checks": 0,
+                    "cleanup_attempts": 0
+                }
+                self._total_connections_created += 1
                 logger.info(f"Added WebSocket connection: {connection_id}")
+
+                # Start monitoring tasks if this is the first connection
+                if len(self._connections) == 1:
+                    await self._start_monitoring_tasks()
 
             return result
 
@@ -123,6 +155,8 @@ class WebSocketManager:
 
             # Remove from tracking
             del self._connections[connection_id]
+            if connection_id in self._connection_metadata:
+                del self._connection_metadata[connection_id]
 
             # Cancel any associated tasks
             if connection_id in self._connection_tasks:
@@ -131,7 +165,13 @@ class WebSocketManager:
                     task.cancel()
                 del self._connection_tasks[connection_id]
 
+            self._total_connections_cleaned += 1
             logger.info(f"Removed WebSocket connection: {connection_id}")
+
+            # Stop monitoring tasks if no connections remain
+            if len(self._connections) == 0:
+                await self._stop_monitoring_tasks()
+
             return result
 
         except Exception as e:
@@ -331,10 +371,22 @@ class WebSocketManager:
         status = {}
 
         for connection_id, client in self._connections.items():
+            metadata = self._connection_metadata.get(connection_id, {})
+            client_stats = client.statistics
+
             status[connection_id] = {
                 "state": client.connection_state.value,
                 "is_connected": client.is_connected,
-                "statistics": client.statistics,
+                "statistics": client_stats,
+                "metadata": {
+                    "created_at": metadata.get("created_at"),
+                    "last_activity": metadata.get("last_activity"),
+                    "health_checks": metadata.get("health_checks", 0),
+                    "cleanup_attempts": metadata.get("cleanup_attempts", 0),
+                    "age_seconds": time.time() - metadata.get("created_at", time.time()),
+                },
+                "health": client.get_connection_health() if hasattr(client, 'get_connection_health') else {},
+                "session_reuse": client.session_statistics if hasattr(client, 'session_statistics') else {},
             }
 
         return status
@@ -347,6 +399,152 @@ class WebSocketManager:
             List of connection identifiers
         """
         return list(self._connections.keys())
+
+    async def _start_monitoring_tasks(self) -> None:
+        """Start background monitoring tasks."""
+        if not self._cleanup_task or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+        if not self._health_monitor_task or self._health_monitor_task.done():
+            self._health_monitor_task = asyncio.create_task(self._health_monitor_loop())
+
+        logger.debug("Started WebSocket manager monitoring tasks")
+
+    async def _stop_monitoring_tasks(self) -> None:
+        """Stop background monitoring tasks."""
+        tasks = [self._cleanup_task, self._health_monitor_task]
+
+        for task in tasks:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        self._cleanup_task = None
+        self._health_monitor_task = None
+        logger.debug("Stopped WebSocket manager monitoring tasks")
+
+    async def _cleanup_loop(self) -> None:
+        """Background task for proactive connection cleanup."""
+        try:
+            while len(self._connections) > 0:
+                await asyncio.sleep(self.cleanup_interval)
+                await self._perform_cleanup()
+        except asyncio.CancelledError:
+            logger.debug("Cleanup loop cancelled")
+        except Exception as e:
+            logger.error(f"Error in cleanup loop: {e}")
+
+    async def _health_monitor_loop(self) -> None:
+        """Background task for connection health monitoring."""
+        try:
+            while len(self._connections) > 0:
+                await asyncio.sleep(self.health_check_interval)
+                await self._perform_health_checks()
+        except asyncio.CancelledError:
+            logger.debug("Health monitor loop cancelled")
+        except Exception as e:
+            logger.error(f"Error in health monitor loop: {e}")
+
+    async def _perform_cleanup(self) -> None:
+        """Perform proactive cleanup of stale connections."""
+        current_time = time.time()
+        connections_to_remove = []
+
+        for connection_id, client in self._connections.items():
+            metadata = self._connection_metadata.get(connection_id, {})
+
+            # Check if connection is in a bad state
+            should_remove = False
+            reason = ""
+
+            if not client.is_connected:
+                should_remove = True
+                reason = "disconnected"
+            elif client.connection_state in [WebSocketConnectionState.ERROR, WebSocketConnectionState.CLOSED]:
+                should_remove = True
+                reason = f"bad state: {client.connection_state.value}"
+            elif hasattr(client, 'is_connection_healthy') and not client.is_connection_healthy():
+                should_remove = True
+                reason = "unhealthy"
+                self._unhealthy_connections_removed += 1
+
+            if should_remove:
+                connections_to_remove.append((connection_id, reason))
+                metadata["cleanup_attempts"] = metadata.get("cleanup_attempts", 0) + 1
+
+        # Remove stale connections
+        for connection_id, reason in connections_to_remove:
+            logger.info(f"Proactively removing connection '{connection_id}': {reason}")
+            try:
+                await self.remove_connection(connection_id)
+            except Exception as e:
+                logger.error(f"Error during proactive cleanup of '{connection_id}': {e}")
+
+        self._last_cleanup_time = current_time
+
+        if connections_to_remove:
+            logger.info(f"Cleanup completed: removed {len(connections_to_remove)} connections")
+
+    async def _perform_health_checks(self) -> None:
+        """Perform health checks on all connections."""
+        current_time = time.time()
+
+        for connection_id, client in self._connections.items():
+            metadata = self._connection_metadata.get(connection_id, {})
+            metadata["health_checks"] = metadata.get("health_checks", 0) + 1
+            metadata["last_activity"] = current_time
+
+            # Update connection health if method is available
+            if hasattr(client, '_update_connection_health'):
+                try:
+                    client._update_connection_health()
+                except Exception as e:
+                    logger.debug(f"Error updating health for '{connection_id}': {e}")
+
+        self._last_health_check_time = current_time
+
+    def get_manager_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive manager statistics."""
+        current_time = time.time()
+
+        # Calculate connection statistics
+        healthy_connections = 0
+        unhealthy_connections = 0
+        total_health_score = 0.0
+
+        for client in self._connections.values():
+            if hasattr(client, 'is_connection_healthy'):
+                if client.is_connection_healthy():
+                    healthy_connections += 1
+                else:
+                    unhealthy_connections += 1
+
+            if hasattr(client, '_connection_quality_score'):
+                total_health_score += client._connection_quality_score
+
+        avg_health_score = (total_health_score / len(self._connections)) if self._connections else 0
+
+        return {
+            "total_connections": len(self._connections),
+            "max_connections": self.max_connections,
+            "healthy_connections": healthy_connections,
+            "unhealthy_connections": unhealthy_connections,
+            "average_health_score": round(avg_health_score, 2),
+            "total_created": self._total_connections_created,
+            "total_cleaned": self._total_connections_cleaned,
+            "unhealthy_removed": self._unhealthy_connections_removed,
+            "cleanup_interval": self.cleanup_interval,
+            "health_check_interval": self.health_check_interval,
+            "last_cleanup_time": self._last_cleanup_time,
+            "last_health_check_time": self._last_health_check_time,
+            "monitoring_active": (
+                self._cleanup_task is not None and not self._cleanup_task.done() and
+                self._health_monitor_task is not None and not self._health_monitor_task.done()
+            )
+        }
 
     async def add_client(self, client_id: str, config: WebSocketConfig) -> str:
         """

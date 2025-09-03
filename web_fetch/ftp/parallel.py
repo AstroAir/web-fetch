@@ -23,6 +23,8 @@ from .models import (
 )
 from .operations import FTPFileOperations
 from .streaming import FTPStreamingDownloader
+from .metrics import get_metrics_collector
+from .profiler import get_profiler
 
 
 class FTPParallelDownloader:
@@ -37,6 +39,9 @@ class FTPParallelDownloader:
         self.streaming_downloader = FTPStreamingDownloader(config)
         self._semaphore = asyncio.Semaphore(config.max_concurrent_downloads)
         self._rate_limiter = asyncio.Semaphore(1)  # For global rate limiting
+        self._metrics = get_metrics_collector() if config.performance_monitoring else None
+        self._profiler = get_profiler() if config.performance_monitoring else None
+        self._active_downloads: Dict[str, float] = {}  # Track active download start times
 
     async def close(self) -> None:
         """Close the downloader and cleanup resources."""

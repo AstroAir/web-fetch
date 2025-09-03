@@ -9,11 +9,16 @@ from .builder import MutationBuilder, QueryBuilder, SubscriptionBuilder
 from .client import GraphQLClient, GraphQLConfig
 from .models import (
     GraphQLError,
+    GraphQLExecutionError,
     GraphQLMutation,
+    GraphQLNetworkError,
     GraphQLQuery,
+    GraphQLRateLimitError,
     GraphQLResult,
     GraphQLSchema,
     GraphQLSubscription,
+    GraphQLTimeoutError,
+    GraphQLValidationError,
     GraphQLVariable,
 )
 from .validator import GraphQLValidator
@@ -29,6 +34,11 @@ __all__ = [
     "GraphQLVariable",
     "GraphQLResult",
     "GraphQLError",
+    "GraphQLExecutionError",
+    "GraphQLNetworkError",
+    "GraphQLRateLimitError",
+    "GraphQLTimeoutError",
+    "GraphQLValidationError",
     "GraphQLSchema",
     # Builders
     "QueryBuilder",

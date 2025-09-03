@@ -15,14 +15,7 @@ from urllib.parse import urlencode
 import aiohttp
 from pydantic import Field, HttpUrl, ConfigDict
 
-from ..exceptions import WebFetchError
-from .base import AuthConfig, AuthMethod, AuthResult, AuthType
-
-
-class AuthenticationError(WebFetchError):
-    """Authentication-specific error."""
-
-    pass
+from .base import AuthConfig, AuthMethod, AuthResult, AuthType, AuthenticationError
 
 
 class GrantType(str):

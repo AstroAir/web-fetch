@@ -12,14 +12,7 @@ from typing import Any
 
 from pydantic import Field, ConfigDict
 
-from ..exceptions import WebFetchError
-from .base import AuthConfig, AuthMethod, AuthResult, AuthType
-
-
-class AuthenticationError(WebFetchError):
-    """Authentication-specific error."""
-
-    pass
+from .base import AuthConfig, AuthMethod, AuthResult, AuthType, AuthenticationError
 
 
 class BasicAuthConfig(AuthConfig):

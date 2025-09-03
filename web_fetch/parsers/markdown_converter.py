@@ -266,7 +266,7 @@ class MarkdownConverter:
             Dictionary with extracted metadata
         """
         soup = BeautifulSoup(html_content, "html.parser")
-        metadata = {}
+        metadata: Dict[str, Any] = {}
 
         # Extract title
         title_tag = soup.find("title")
@@ -275,24 +275,30 @@ class MarkdownConverter:
 
         # Extract meta description
         meta_desc = soup.find("meta", attrs={"name": "description"})
-        if meta_desc:
-            metadata["description"] = meta_desc.get("content", "")
+        if meta_desc and hasattr(meta_desc, 'get'):
+            content = meta_desc.get("content", "")
+            metadata["description"] = str(content) if content else ""
 
         # Extract meta keywords
         meta_keywords = soup.find("meta", attrs={"name": "keywords"})
-        if meta_keywords:
-            metadata["keywords"] = meta_keywords.get("content", "").split(",")
+        if meta_keywords and hasattr(meta_keywords, 'get'):
+            content = meta_keywords.get("content", "")
+            if isinstance(content, str):
+                metadata["keywords"] = content.split(",")
+            else:
+                metadata["keywords"] = str(content).split(",") if content else []
 
         # Extract author
         meta_author = soup.find("meta", attrs={"name": "author"})
-        if meta_author:
-            metadata["author"] = meta_author.get("content", "")
+        if meta_author and hasattr(meta_author, 'get'):
+            content = meta_author.get("content", "")
+            metadata["author"] = str(content) if content else ""
 
         # Count elements
-        metadata["headings"] = len(soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]))
-        metadata["paragraphs"] = len(soup.find_all("p"))
-        metadata["links"] = len(soup.find_all("a", href=True))
-        metadata["images"] = len(soup.find_all("img", src=True))
+        metadata["headings"] = str(len(soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])))
+        metadata["paragraphs"] = str(len(soup.find_all("p")))
+        metadata["links"] = str(len(soup.find_all("a", href=True)))
+        metadata["images"] = str(len(soup.find_all("img", src=True)))
         metadata["tables"] = len(soup.find_all("table"))
         metadata["lists"] = len(soup.find_all(["ul", "ol"]))
         metadata["code_blocks"] = len(soup.find_all(["pre", "code"]))
@@ -300,8 +306,8 @@ class MarkdownConverter:
         # Extract text statistics
         text_content = soup.get_text()
         words = text_content.split()
-        metadata["word_count"] = len(words)
-        metadata["character_count"] = len(text_content)
+        metadata["word_count"] = str(len(words))
+        metadata["character_count"] = str(len(text_content))
 
         return metadata
 
@@ -328,18 +334,21 @@ class MarkdownConverter:
         tbody = table.find("tbody")
 
         headers = []
-        data_rows = []
+        data_rows: list[Any] = []
 
         if thead:
             # Extract headers from thead
             header_rows = thead.find_all("tr")
             if header_rows:
-                for th in header_rows[0].find_all(["th", "td"]):
-                    cell_text = self._clean_cell_text(th.get_text())
-                    colspan = int(th.get("colspan", 1))
-                    headers.extend([cell_text] + [""] * (colspan - 1))
+                first_row = header_rows[0]
+                if hasattr(first_row, 'find_all') and callable(getattr(first_row, 'find_all')):
+                    for th in first_row.find_all(["th", "td"]):
+                        cell_text = self._clean_cell_text(th.get_text())
+                        colspan_attr = th.get("colspan", 1)
+                        colspan = int(colspan_attr) if isinstance(colspan_attr, (str, int)) else 1
+                        headers.extend([cell_text] + [""] * (colspan - 1))
 
-        if tbody:
+        if tbody and hasattr(tbody, 'find_all'):
             # Extract data from tbody
             data_rows = tbody.find_all("tr")
         else:
@@ -349,10 +358,12 @@ class MarkdownConverter:
                 if not headers:
                     # First row as header if no thead
                     first_row = all_rows[0]
-                    for cell in first_row.find_all(["th", "td"]):
-                        cell_text = self._clean_cell_text(cell.get_text())
-                        colspan = int(cell.get("colspan", 1))
-                        headers.extend([cell_text] + [""] * (colspan - 1))
+                    if hasattr(first_row, 'find_all') and callable(getattr(first_row, 'find_all')):
+                        for cell in first_row.find_all(["th", "td"]):
+                            cell_text = self._clean_cell_text(cell.get_text())
+                            colspan_attr = cell.get("colspan", 1)
+                            colspan = int(colspan_attr) if isinstance(colspan_attr, (str, int)) else 1
+                            headers.extend([cell_text] + [""] * (colspan - 1))
                     data_rows = all_rows[1:]
                 else:
                     data_rows = all_rows
@@ -371,10 +382,14 @@ class MarkdownConverter:
 
         # Process data rows
         for row in data_rows:
+            if not hasattr(row, 'find_all') or not callable(getattr(row, 'find_all')):
+                continue
+
             cells = []
             for td in row.find_all(["td", "th"]):
                 cell_text = self._clean_cell_text(td.get_text())
-                colspan = int(td.get("colspan", 1))
+                colspan_attr = td.get("colspan", 1)
+                colspan = int(colspan_attr) if isinstance(colspan_attr, (str, int)) else 1
                 cells.extend([cell_text] + [""] * (colspan - 1))
 
             # Ensure row has same number of columns as header

@@ -65,6 +65,7 @@ dependencies = [
     "boto3>=1.40.0", # AWS SDK
     "google-cloud-storage>=3.2.0", # Google Cloud Storage
     "azure-storage-blob>=12.26.0", # Azure Blob Storage
+    "psutil>=7.0.0",
 ]
 
 [project.optional-dependencies]
@@ -223,4 +224,9 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[dependency-groups]
+dev = [
+    "types-psutil>=7.0.0.20250822",
 ]

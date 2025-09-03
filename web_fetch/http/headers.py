@@ -7,8 +7,11 @@ validation, and intelligent header handling.
 
 import re
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel, Field
+
+from .security import SecurityMiddleware, SSRFProtectionConfig
 
 
 class HeaderPresets:
@@ -86,8 +89,18 @@ class HeaderRule(BaseModel):
 class HeaderManager:
     """Advanced header management with rules and validation."""
 
-    def __init__(self) -> None:
-        """Initialize header manager."""
+    def __init__(
+        self,
+        security_config: Optional[SSRFProtectionConfig] = None,
+        enable_security: bool = True
+    ) -> None:
+        """
+        Initialize header manager.
+
+        Args:
+            security_config: Security configuration for validation
+            enable_security: Enable security features
+        """
         self._rules: List[HeaderRule] = []
         self._global_headers: Dict[str, str] = {}
         self._sensitive_headers: Set[str] = {
@@ -97,7 +110,25 @@ class HeaderManager:
             "x-auth-token",
             "proxy-authorization",
             "www-authenticate",
+            "x-forwarded-for",
+            "x-real-ip",
+            "x-forwarded-host",
         }
+
+        # Security features
+        self._enable_security = enable_security
+        self._security_middleware = SecurityMiddleware(security_config) if enable_security else None
+
+        # Injection attack patterns
+        self._injection_patterns = [
+            r'<script[^>]*>.*?</script>',  # Script tags
+            r'javascript:',               # JavaScript protocol
+            r'vbscript:',                # VBScript protocol
+            r'data:.*base64',            # Data URLs with base64
+            r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]',  # Control characters
+            r'%[0-9a-fA-F]{2}',          # URL encoding (suspicious in headers)
+        ]
+        self._compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in self._injection_patterns]
 
     def add_global_headers(self, headers: Dict[str, str]) -> None:
         self._global_headers.update(headers)
@@ -131,10 +162,20 @@ class HeaderManager:
         return headers
 
     def validate_headers(self, headers: Dict[str, Any]) -> List[str]:
+        """
+        Validate headers with enhanced security checks.
+
+        Args:
+            headers: Headers to validate
+
+        Returns:
+            List of validation issues
+        """
         issues: List[str] = []
+
         for name, value in headers.items():
-            # Check header name format
-            if not re.match(r"^[a-zA-Z0-9\-_]+$", name):
+            # Check header name format (RFC 7230 compliant)
+            if not self._is_valid_header_name(name):
                 issues.append(f"Invalid header name format: {name}")
 
             # Check for sensitive headers in logs
@@ -142,26 +183,163 @@ class HeaderManager:
                 issues.append(f"Sensitive header detected: {name}")
 
             # Normalize to string for further checks
-            is_str = isinstance(value, str)
             str_value = str(value)
-            if not is_str:
+            if not isinstance(value, str):
                 issues.append(f"Header value must be string: {name}")
 
-            # Check for control characters
-            if re.search(r"[\x00-\x1f\x7f]", str_value):
-                issues.append(f"Header value contains control characters: {name}")
+            # Enhanced security validation
+            if self._enable_security:
+                security_issues = self._validate_header_security(name, str_value)
+                issues.extend(security_issues)
 
         return issues
 
+    def _is_valid_header_name(self, name: str) -> bool:
+        """Check if header name is RFC 7230 compliant."""
+        if not name or not isinstance(name, str):
+            return False
+
+        # RFC 7230: header names are tokens
+        return re.match(r'^[!#$%&\'*+\-.0-9A-Z^_`a-z|~]+$', name) is not None
+
+    def _validate_header_security(self, name: str, value: str) -> List[str]:
+        """Perform security validation on header value."""
+        issues: List[str] = []
+
+        # Check for control characters (except tab)
+        if re.search(r"[\x00-\x08\x0B\x0C\x0E-\x1f\x7f]", value):
+            issues.append(f"Header value contains control characters: {name}")
+
+        # Check for injection attack patterns
+        for pattern in self._compiled_patterns:
+            if pattern.search(value):
+                issues.append(f"Potential injection attack in header {name}")
+                break
+
+        # Check header-specific security rules
+        name_lower = name.lower()
+        if name_lower == 'host':
+            if not self._validate_host_header(value):
+                issues.append(f"Invalid Host header value: {value}")
+        elif name_lower == 'referer':
+            if not self._validate_referer_header(value):
+                issues.append(f"Invalid Referer header value: {value}")
+        elif name_lower in ['x-forwarded-for', 'x-real-ip']:
+            if not self._validate_ip_header(value):
+                issues.append(f"Invalid IP header value: {value}")
+
+        # Check for excessively long headers
+        if len(value) > 8192:  # 8KB limit
+            issues.append(f"Header value too long: {name}")
+
+        return issues
+
+    def _validate_host_header(self, value: str) -> bool:
+        """Validate Host header to prevent host header injection."""
+        # Basic format: hostname[:port]
+        return re.match(r'^[a-zA-Z0-9.-]+(?::[0-9]+)?$', value) is not None
+
+    def _validate_referer_header(self, value: str) -> bool:
+        """Validate Referer header."""
+        if not value:
+            return True  # Empty referer is valid
+
+        # Must be a valid URL
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(value)
+            return bool(parsed.scheme in ['http', 'https'] and parsed.netloc)
+        except Exception:
+            return False
+
+    def _validate_ip_header(self, value: str) -> bool:
+        """Validate IP address headers."""
+        # Can contain multiple IPs separated by commas
+        ips = [ip.strip() for ip in value.split(',')]
+
+        for ip in ips:
+            if not self._is_valid_ip(ip):
+                return False
+
+        return True
+
+    def _is_valid_ip(self, ip: str) -> bool:
+        """Check if string is a valid IP address."""
+        try:
+            import ipaddress
+            ipaddress.ip_address(ip)
+            return True
+        except ValueError:
+            return False
+
     def sanitize_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+        """
+        Sanitize headers by removing invalid characters and values.
+
+        Args:
+            headers: Headers to sanitize
+
+        Returns:
+            Sanitized headers dictionary
+        """
         sanitized: Dict[str, str] = {}
+
         for name, value in headers.items():
-            if not re.match(r"^[a-zA-Z0-9\-_]+$", name):
+            # Skip invalid header names
+            if not self._is_valid_header_name(name):
                 continue
+
             str_value = str(value)
-            clean_value = re.sub(r"[\x00-\x1f\x7f]", "", str_value)
+
+            # Remove control characters (except tab)
+            clean_value = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1f\x7f]", "", str_value)
+
+            # Remove potential injection patterns if security is enabled
+            if self._enable_security:
+                for pattern in self._compiled_patterns:
+                    clean_value = pattern.sub("", clean_value)
+
+            # Trim whitespace
+            clean_value = clean_value.strip()
+
+            # Skip empty values
+            if not clean_value:
+                continue
+
+            # Truncate excessively long headers
+            if len(clean_value) > 8192:
+                clean_value = clean_value[:8192]
+
             sanitized[name] = clean_value
+
         return sanitized
+
+    async def validate_and_sanitize(self, headers: Dict[str, Any]) -> tuple[Dict[str, str], List[str]]:
+        """
+        Validate and sanitize headers in one operation.
+
+        Args:
+            headers: Headers to process
+
+        Returns:
+            Tuple of (sanitized_headers, validation_issues)
+        """
+        # Use security middleware if available
+        if self._security_middleware:
+            try:
+                _, validated_headers = await self._security_middleware.validate_request("", headers)
+                issues = []
+            except Exception as e:
+                validated_headers = headers
+                issues = [str(e)]
+        else:
+            validated_headers = headers
+            issues = self.validate_headers(headers)
+
+        # Sanitize the headers
+        sanitized_headers = self.sanitize_headers(validated_headers)
+
+        return sanitized_headers, issues
 
     def get_headers_for_domain(self, domain: str) -> Dict[str, str]:
         headers: Dict[str, str] = {}

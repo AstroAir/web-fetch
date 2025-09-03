@@ -21,7 +21,7 @@ class SensitiveDataFilter(logging.Filter):
         super().__init__()
 
         # Patterns for sensitive data
-        self.patterns: List[Pattern] = [
+        self.patterns: List[Pattern[str]] = [
             # API keys and tokens
             re.compile(
                 r'(api[_-]?key|token|secret)["\s]*[:=]["\s]*([a-zA-Z0-9+/=]{20,})',

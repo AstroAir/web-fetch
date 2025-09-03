@@ -12,7 +12,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Dict, Optional, TextIO, cast
+from typing import Any, Dict, Optional, TextIO, cast
 
 
 class AsyncFileHandler(logging.Handler):
@@ -32,8 +32,8 @@ class AsyncFileHandler(logging.Handler):
         self.mode = mode
         self.encoding = encoding
         self._file: Optional[TextIO] = None
-        self._queue: asyncio.Queue = asyncio.Queue()
-        self._task: Optional[asyncio.Task] = None
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._task: Optional[asyncio.Task[None]] = None
         self._lock = threading.Lock()
         self._closed = False
 
@@ -213,7 +213,7 @@ class MetricsHandler(logging.Handler):
         """Initialize metrics handler."""
         super().__init__()
         self._metrics: Dict[str, int] = defaultdict(int)
-        self._recent_logs: deque = deque(maxlen=1000)
+        self._recent_logs: deque[Dict[str, Any]] = deque(maxlen=1000)
         self._lock = threading.Lock()
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -248,7 +248,7 @@ class MetricsHandler(logging.Handler):
         with self._lock:
             return dict(self._metrics)
 
-    def get_recent_logs(self) -> list:
+    def get_recent_logs(self) -> list[Dict[str, Any]]:
         """Get recent log entries."""
         with self._lock:
             return list(self._recent_logs)

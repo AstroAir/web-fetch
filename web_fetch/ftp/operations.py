@@ -35,6 +35,10 @@ from .models import (
     FTPVerificationMethod,
     FTPVerificationResult,
 )
+from .metrics import get_metrics_collector
+from .profiler import get_profiler
+from .circuit_breaker import get_circuit_breaker, CircuitBreakerError
+from .retry import get_retry_manager, RetryableError
 
 
 # Helper types matching aioftp list/stat structures
@@ -192,10 +196,51 @@ class FTPFileOperations:
         """Initialize FTP operations with configuration."""
         self.config = config
         self.connection_pool = FTPConnectionPool(config)
+        self._metrics = get_metrics_collector() if config.performance_monitoring else None
+        self._profiler = get_profiler() if config.performance_monitoring else None
+        self._circuit_breaker = get_circuit_breaker() if config.performance_monitoring else None
+        self._retry_manager = get_retry_manager() if config.performance_monitoring else None
+        self._adaptive_chunk_sizes: Dict[str, int] = {}  # Track optimal chunk sizes per host
 
     async def close(self) -> None:
         """Close the operations handler and cleanup resources."""
         await self.connection_pool.close_all()
+
+    def _get_adaptive_chunk_size(self, host: str, current_rate: float = 0.0) -> int:
+        """
+        Get adaptive chunk size based on transfer performance.
+
+        Args:
+            host: Target host for the transfer
+            current_rate: Current transfer rate in bytes/second
+
+        Returns:
+            Optimal chunk size for the host
+        """
+        if not self.config.adaptive_chunk_size:
+            return self.config.chunk_size
+
+        # Get current chunk size for this host
+        current_chunk = self._adaptive_chunk_sizes.get(host, self.config.chunk_size)
+
+        # If we have performance data, adjust chunk size
+        if current_rate > 0:
+            # Target: 1MB/s or higher should use larger chunks
+            # Lower speeds should use smaller chunks to reduce memory usage
+            if current_rate > 1024 * 1024:  # > 1MB/s
+                # Increase chunk size for high-speed connections
+                new_chunk = min(current_chunk * 1.2, self.config.max_chunk_size)
+            elif current_rate < 100 * 1024:  # < 100KB/s
+                # Decrease chunk size for slow connections
+                new_chunk = max(current_chunk * 0.8, self.config.min_chunk_size)
+            else:
+                # Keep current chunk size for moderate speeds
+                new_chunk = current_chunk
+
+            self._adaptive_chunk_sizes[host] = int(new_chunk)
+            return int(new_chunk)
+
+        return current_chunk
 
     async def list_directory(self, url: str) -> List[FTPFileInfo]:
         """
@@ -312,6 +357,15 @@ class FTPFileOperations:
         total_bytes = None
         error = None
 
+        # Initialize metrics tracking
+        transfer_id = f"download_{int(start_time * 1000)}_{hash(url) % 10000}"
+        if self._metrics:
+            self._metrics.start_transfer(transfer_id, url, "download", self.config.chunk_size)
+
+        # Get host for adaptive chunk sizing
+        parsed = urlparse(url)
+        host = parsed.hostname or "localhost"
+
         try:
             # Ensure local directory exists
             local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -355,34 +409,46 @@ class FTPFileOperations:
                     if resume_position > 0:
                         await client.command(f"REST {resume_position}")
 
-                    # Download file
+                    # Download file with adaptive chunk sizing
                     async with client.download_stream(remote_path) as stream:
                         last_progress_time = time.time()
+                        last_rate_calculation = time.time()
+                        current_chunk_size = self._get_adaptive_chunk_size(host)
 
-                        async for chunk in stream.iter_by_block(self.config.chunk_size):
+                        async for chunk in stream.iter_by_block(current_chunk_size):
                             await local_file.write(chunk)
                             bytes_transferred += len(chunk)
+
+                            # Update metrics
+                            if self._metrics:
+                                self._metrics.update_transfer(transfer_id, bytes_transferred + resume_position, total_bytes)
+
+                            # Calculate current transfer rate and adapt chunk size
+                            current_time = time.time()
+                            if current_time - last_rate_calculation >= 1.0:  # Recalculate every second
+                                current_rate = bytes_transferred / (current_time - start_time) if current_time > start_time else 0
+                                if self.config.adaptive_chunk_size:
+                                    new_chunk_size = self._get_adaptive_chunk_size(host, current_rate)
+                                    if new_chunk_size != current_chunk_size:
+                                        current_chunk_size = new_chunk_size
+                                last_rate_calculation = current_time
 
                             # Progress callback
                             if (
                                 progress_callback
-                                and time.time() - last_progress_time >= 0.1
+                                and current_time - last_progress_time >= 0.1
                             ):
+                                current_rate = bytes_transferred / (current_time - start_time) if current_time > start_time else 0
                                 progress_info = FTPProgressInfo(
-                                    bytes_transferred=bytes_transferred
-                                    + resume_position,
+                                    bytes_transferred=bytes_transferred + resume_position,
                                     total_bytes=total_bytes,
-                                    transfer_rate=(
-                                        bytes_transferred / (time.time() - start_time)
-                                        if time.time() > start_time
-                                        else 0
-                                    ),
-                                    elapsed_time=time.time() - start_time,
+                                    transfer_rate=current_rate,
+                                    elapsed_time=current_time - start_time,
                                     estimated_time_remaining=None,
                                     current_file=str(local_path),
                                 )
                                 await progress_callback(progress_info)
-                                last_progress_time = time.time()
+                                last_progress_time = current_time
 
                             # Rate limiting
                             if self.config.rate_limit_bytes_per_second:
@@ -407,6 +473,10 @@ class FTPFileOperations:
                         actual_value=verification_result.actual_value,
                     )
 
+            # Mark transfer as successful in metrics
+            if self._metrics:
+                self._metrics.complete_transfer(transfer_id, success=True)
+
             return FTPResult(
                 url=url,
                 operation="download",
@@ -428,6 +498,10 @@ class FTPFileOperations:
             error = str(e)
             if not isinstance(e, (FTPError, FTPVerificationError)):
                 e = ErrorHandler.handle_ftp_error(e, url, "download_file")
+
+            # Mark transfer as failed in metrics
+            if self._metrics:
+                self._metrics.complete_transfer(transfer_id, success=False, error=error)
 
             return FTPResult(
                 url=url,

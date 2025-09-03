@@ -8,10 +8,10 @@ header parsing and file loading.
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
-def parse_headers(header_strings: Optional[List[str]]) -> dict:
+def parse_headers(header_strings: Optional[List[str]]) -> Dict[str, str]:
     """
     Parse header strings into a dictionary.
 

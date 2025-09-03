@@ -9,7 +9,7 @@ from web_fetch.models.resource import ResourceKind, ResourceRequest
 async def test_websocket_component_adapter_minimal(monkeypatch):
     # Arrange: mock WebSocketClient to avoid real WS
     from web_fetch.websocket.client import WebSocketClient
-    from web_fetch.websocket.models import WebSocketMessage, WebSocketMessageType, WebSocketResult, WebSocketConnectionState
+    from web_fetch.websocket.core_models import WebSocketMessage, WebSocketMessageType, WebSocketResult, WebSocketConnectionState
 
     async def fake_aenter(self):
         return self

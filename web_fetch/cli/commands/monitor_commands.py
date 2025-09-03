@@ -7,11 +7,12 @@ system monitoring and metrics collection.
 """
 
 import sys
+from typing import Any
 
 import click
 
 
-def create_monitor_commands(monitor_group):
+def create_monitor_commands(monitor_group: Any) -> None:
     """Create and register monitor commands with the monitor group."""
     
     @monitor_group.command()

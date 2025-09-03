@@ -1,0 +1,124 @@
+site_name: WebFetch Documentation
+site_description: Comprehensive Web Content Fetching Library
+site_url: https://your-org.github.io/web-fetch/
+repo_url: https://github.com/AstroAir/web-fetch
+repo_name: AstroAir/web-fetch
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - mermaid2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - abbr
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Basic Examples: getting-started/basic-examples.md
+  - User Guide:
+    - Configuration: user-guide/configuration.md
+    - Content Types: user-guide/content-types.md
+    - Error Handling: user-guide/error-handling.md
+    - Caching: user-guide/caching.md
+    - Rate Limiting: user-guide/rate-limiting.md
+  - API Reference:
+    - Core API: api/core.md
+    - Models: api/models.md
+    - Utilities: api/utilities.md
+    - Exceptions: api/exceptions.md
+  - Advanced Topics:
+    - Streaming: advanced/streaming.md
+    - Authentication: advanced/authentication.md
+    - Crawlers: advanced/crawlers.md
+    - FTP Operations: advanced/ftp.md
+    - Batch Processing: advanced/batch.md
+    - Performance: advanced/performance.md
+  - CLI Tools:
+    - Overview: cli/overview.md
+    - Examples: cli/examples.md
+    - Rich Interface: cli/rich-interface.md
+  - Examples:
+    - Basic Usage: examples/basic.md
+    - Advanced Usage: examples/advanced.md
+    - Real-world Cases: examples/real-world.md
+    - Parser Examples: examples/parsers.md
+    - Configuration Examples: examples/configuration.md
+  - MCP Integration:
+    - Overview: mcp/overview.md
+    - Server Setup: mcp/server.md
+    - Integration Guide: mcp/integration.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+    - Architecture: development/architecture.md
+    - Migration Guide: development/migration.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/AstroAir/web-fetch
+  version:
+    provider: mike
+
+copyright: Copyright &copy; 2024 WebFetch Contributors

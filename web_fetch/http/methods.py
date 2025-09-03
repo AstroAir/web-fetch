@@ -6,8 +6,9 @@ proper request/response handling and validation.
 """
 
 import json
+from contextlib import asynccontextmanager
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union, Protocol
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union, Protocol
 from urllib.parse import urlencode  # used by callers; keep imported
 
 import aiohttp
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from ..exceptions import WebFetchError
 from ..models import FetchRequest, FetchResult
+from .session_manager import SessionManager, SessionConfig
 
 
 class HTTPMethod(str, Enum):
@@ -54,10 +56,20 @@ class _MethodHandlerProto(Protocol):
     ) -> aiohttp.ClientResponse: ...
 
 class HTTPMethodHandler:
-    """Handler for different HTTP methods."""
+    """Handler for different HTTP methods with enhanced session management."""
 
-    def __init__(self) -> None:
-        """Initialize HTTP method handler."""
+    def __init__(
+        self,
+        session_manager: Optional[SessionManager] = None,
+        session_config: Optional[SessionConfig] = None
+    ) -> None:
+        """
+        Initialize HTTP method handler.
+
+        Args:
+            session_manager: Optional session manager for reuse
+            session_config: Optional session configuration
+        """
         # 使用 Protocol 明确处理函数签名，避免变量类型别名在类型表达式中的限制
         self._method_handlers: Dict[HTTPMethod, _MethodHandlerProto] = {
             HTTPMethod.GET: self._handle_get,
@@ -70,9 +82,56 @@ class HTTPMethodHandler:
             HTTPMethod.TRACE: self._handle_trace,
         }
 
+        self._session_manager = session_manager
+        self._session_config = session_config
+        self._owned_manager = session_manager is None
+
+    async def _get_session_manager(self) -> SessionManager:
+        """Get or create session manager."""
+        if self._session_manager is None:
+            self._session_manager = SessionManager(self._session_config)
+        return self._session_manager
+
+    @asynccontextmanager
+    async def managed_request(
+        self,
+        method: HTTPMethod,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        body: Optional[RequestBody] = None,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[aiohttp.ClientResponse, None]:
+        """
+        Execute HTTP request with managed session lifecycle.
+
+        Args:
+            method: HTTP method
+            url: Request URL
+            headers: Request headers
+            body: Request body
+            params: URL parameters
+            **kwargs: Additional arguments
+
+        Yields:
+            HTTP response
+
+        Raises:
+            WebFetchError: If method is not supported
+        """
+        if method not in self._method_handlers:
+            raise WebFetchError(f"Unsupported HTTP method: {method}")
+
+        session_manager = await self._get_session_manager()
+        async with session_manager.get_session() as session:
+            handler = self._method_handlers[method]
+            response = await handler(session, url, headers, body, params, **kwargs)
+            async with response:
+                yield response
+
     async def execute_request(
         self,
-        session: aiohttp.ClientSession,
+        session: Optional[aiohttp.ClientSession],
         method: HTTPMethod,
         url: str,
         headers: Optional[Dict[str, str]] = None,
@@ -84,7 +143,7 @@ class HTTPMethodHandler:
         Execute HTTP request with specified method.
 
         Args:
-            session: aiohttp session
+            session: Optional aiohttp session (will create managed one if None)
             method: HTTP method
             url: Request URL
             headers: Request headers
@@ -101,9 +160,30 @@ class HTTPMethodHandler:
         if method not in self._method_handlers:
             raise WebFetchError(f"Unsupported HTTP method: {method}")
 
-        handler = self._method_handlers[method]
-        # 通过 Protocol 已经将返回类型限定为 aiohttp.ClientResponse
-        return await handler(session, url, headers, body, params, **kwargs)
+        # Use managed session if none provided
+        if session is None:
+            session_manager = await self._get_session_manager()
+            async with session_manager.get_session() as managed_session:
+                handler = self._method_handlers[method]
+                return await handler(managed_session, url, headers, body, params, **kwargs)
+        else:
+            handler = self._method_handlers[method]
+            # 通过 Protocol 已经将返回类型限定为 aiohttp.ClientResponse
+            return await handler(session, url, headers, body, params, **kwargs)
+
+    async def close(self) -> None:
+        """Close session manager if owned by this handler."""
+        if self._owned_manager and self._session_manager:
+            await self._session_manager.close()
+            self._session_manager = None
+
+    async def __aenter__(self) -> 'HTTPMethodHandler':
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Async context manager exit."""
+        await self.close()
 
     async def _handle_get(
         self,

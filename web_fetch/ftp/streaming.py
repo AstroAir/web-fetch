@@ -19,6 +19,8 @@ from ..exceptions import ErrorHandler, FTPError
 from .connection import FTPConnectionPool
 from .models import FTPConfig, FTPProgressInfo, FTPResult, FTPTransferMode
 from .operations import FTPFileOperations
+from .metrics import get_metrics_collector
+from .profiler import get_profiler
 
 
 class FTPStreamingDownloader:
@@ -32,6 +34,9 @@ class FTPStreamingDownloader:
         self.config = config
         self.connection_pool = FTPConnectionPool(config)
         self.file_operations = FTPFileOperations(config)
+        self._metrics = get_metrics_collector() if config.performance_monitoring else None
+        self._profiler = get_profiler() if config.performance_monitoring else None
+        self._stream_buffer_pool: Dict[str, bytes] = {}  # Buffer pool for memory efficiency
 
     async def close(self) -> None:
         """Close the downloader and cleanup resources."""

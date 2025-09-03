@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from pydantic import HttpUrl, TypeAdapter
 
 from ..websocket.client import WebSocketClient
-from ..websocket.models import WebSocketConfig, WebSocketResult
+from ..websocket.core_models import WebSocketConfig, WebSocketResult
 from ..models.resource import ResourceConfig, ResourceKind, ResourceRequest, ResourceResult
 from .base import ResourceComponent, component_registry
 

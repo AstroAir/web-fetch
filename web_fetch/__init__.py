@@ -137,6 +137,18 @@ from .ftp import (
     ftp_download_file,
     ftp_get_file_info,
     ftp_list_directory,
+    # Performance optimization features
+    FTPConfigPresets,
+    FTPMetricsCollector,
+    FTPMonitor,
+    FTPProfiler,
+    OptimizedPreset,
+    PerformanceReport,
+    UseCase,
+    get_metrics_collector,
+    get_monitor,
+    get_profiler,
+    profile,
 )
 
 # Enhanced HTTP support
@@ -258,6 +270,18 @@ __all__ = [
     "ftp_download_batch",
     "ftp_list_directory",
     "ftp_get_file_info",
+    # FTP Performance optimization features
+    "FTPConfigPresets",
+    "FTPMetricsCollector",
+    "FTPMonitor",
+    "FTPProfiler",
+    "OptimizedPreset",
+    "PerformanceReport",
+    "UseCase",
+    "get_metrics_collector",
+    "get_monitor",
+    "get_profiler",
+    "profile",
     # Crawler API functions
     "crawler_fetch_url",
     "crawler_fetch_urls",

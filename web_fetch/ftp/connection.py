@@ -17,6 +17,9 @@ import aioftp
 
 from ..exceptions import ErrorHandler, FTPError
 from .models import FTPAuthType, FTPConfig, FTPConnectionInfo, FTPMode
+from .metrics import get_metrics_collector
+from .profiler import get_profiler
+from .circuit_breaker import get_circuit_breaker, CircuitBreakerError
 
 
 class FTPConnectionPool:
@@ -30,7 +33,11 @@ class FTPConnectionPool:
         self._connections: Dict[str, List[aioftp.Client]] = {}
         self._connection_info: Dict[str, FTPConnectionInfo] = {}
         self._lock = asyncio.Lock()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task[None]] = None
+        self._metrics = get_metrics_collector() if config.performance_monitoring else None
+        self._profiler = get_profiler() if config.performance_monitoring else None
+        self._circuit_breaker = get_circuit_breaker() if config.performance_monitoring else None
+        self._last_activity: Dict[str, float] = {}  # Track last activity per connection key
         self._start_cleanup_task()
 
     def _start_cleanup_task(self) -> None:
@@ -55,11 +62,30 @@ class FTPConnectionPool:
             pass
 
     async def _cleanup_connections(self) -> None:
-        """Background task to clean up idle connections."""
+        """Background task to clean up idle connections with adaptive intervals."""
+        base_interval = 60  # Base cleanup interval in seconds
+        min_interval = 30   # Minimum cleanup interval
+        max_interval = 300  # Maximum cleanup interval
+
         while True:
             try:
-                await asyncio.sleep(60)  # Check every minute
+                # Calculate adaptive cleanup interval based on activity
+                if self.config.adaptive_cleanup_interval:
+                    total_connections = sum(len(conns) for conns in self._connections.values())
+                    activity_factor = min(total_connections / 10, 2.0)  # Scale based on connection count
+                    cleanup_interval = max(min_interval, min(base_interval / activity_factor, max_interval))
+                else:
+                    cleanup_interval = base_interval
+
+                await asyncio.sleep(cleanup_interval)
                 await self._cleanup_idle_connections()
+
+                # Record cleanup operation in metrics
+                if self._metrics:
+                    for key in self._connection_info:
+                        host, port = key.split(':')[:2]
+                        self._metrics.record_connection_created(host, int(port))
+
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -125,11 +151,40 @@ class FTPConnectionPool:
                 and self._connections[connection_key]
             ):
                 client = self._connections[connection_key].pop()
-                self._connection_info[connection_key].last_used = datetime.now()
-                self._connection_info[connection_key].connection_count += 1
+
+                # Perform health check if enabled
+                if self.config.connection_health_check:
+                    try:
+                        # Simple health check - send NOOP command
+                        await client.command("NOOP")
+                        connection_healthy = True
+                    except Exception:
+                        connection_healthy = False
+                        try:
+                            await client.quit()
+                        except Exception:
+                            pass
+                else:
+                    connection_healthy = True
+
+                if connection_healthy:
+                    self._connection_info[connection_key].last_used = datetime.now()
+                    self._connection_info[connection_key].connection_count += 1
+                    self._last_activity[connection_key] = time.time()
+
+                    # Record connection reuse in metrics
+                    if self._metrics:
+                        self._metrics.record_connection_reused(host, port)
+                else:
+                    # Health check failed, create new connection
+                    client = await self._create_connection(host, port, username, password)
+                    if self._metrics:
+                        self._metrics.record_connection_created(host, port)
             else:
                 # Create new connection
                 client = await self._create_connection(host, port, username, password)
+                if self._metrics:
+                    self._metrics.record_connection_created(host, port)
 
                 # Update connection info
                 if connection_key not in self._connection_info:

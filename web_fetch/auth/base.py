@@ -15,6 +15,14 @@ from typing import Any, Dict, Optional, Union
 
 from pydantic import BaseModel, Field, ConfigDict
 
+from ..exceptions import WebFetchError
+
+
+class AuthenticationError(WebFetchError):
+    """Authentication-specific error."""
+
+    pass
+
 
 class AuthType(str, Enum):
     """Supported authentication types."""

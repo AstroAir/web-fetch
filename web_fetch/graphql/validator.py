@@ -559,28 +559,130 @@ class GraphQLValidator:
         return max_depth
 
     def _calculate_query_complexity(self, query_text: str) -> int:
-        """Calculate query complexity score."""
+        """Calculate advanced query complexity score with detailed analysis."""
         complexity = 0
 
-        # Count fields (each field adds to complexity)
+        # Base field complexity
         field_count = len(
             re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\{|$|\()", query_text)
         )
         complexity += field_count
 
-        # Count fragments (fragments add complexity)
-        fragment_count = len(re.findall(r"\.\.\.", query_text))
-        complexity += fragment_count * 2
+        # Fragment complexity (higher weight for inline fragments)
+        fragment_spread_count = len(re.findall(r"\.\.\.\s*[a-zA-Z_]", query_text))
+        inline_fragment_count = len(re.findall(r"\.\.\.\s*on\s+", query_text))
+        complexity += fragment_spread_count * 2 + inline_fragment_count * 3
 
-        # Count variables (variables add slight complexity)
+        # Variable complexity
         variable_count = len(re.findall(r"\$[a-zA-Z_][a-zA-Z0-9_]*", query_text))
         complexity += variable_count
 
-        # Count arguments (arguments add complexity)
-        argument_count = len(re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*\s*:", query_text))
-        complexity += argument_count
+        # Argument complexity (weighted by type)
+        simple_args = len(re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*[^{\[{]", query_text))
+        complex_args = len(re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*\s*:\s*[{\[]", query_text))
+        complexity += simple_args + complex_args * 3
+
+        # Directive complexity
+        directive_count = len(re.findall(r"@[a-zA-Z_][a-zA-Z0-9_]*", query_text))
+        complexity += directive_count * 2
+
+        # Nested query complexity (exponential growth for deep nesting)
+        depth = self._calculate_query_depth(query_text)
+        if depth > 5:
+            complexity += (depth - 5) ** 2
+
+        # List field complexity (pagination patterns)
+        list_patterns = len(re.findall(r"(first|last|limit|offset|take|skip)\s*:", query_text))
+        complexity += list_patterns * 2
 
         return complexity
+
+    def analyze_query_complexity(
+        self, query: Union[GraphQLQuery, GraphQLMutation, GraphQLSubscription]
+    ) -> Dict[str, Any]:
+        """
+        Perform detailed query complexity analysis.
+
+        Args:
+            query: GraphQL query to analyze
+
+        Returns:
+            Detailed complexity analysis report
+        """
+        query_text = query.query
+
+        analysis = {
+            "total_complexity": self._calculate_query_complexity(query_text),
+            "depth": self._calculate_query_depth(query_text),
+            "field_count": len(re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\{|$|\()", query_text)),
+            "fragment_count": len(re.findall(r"\.\.\.", query_text)),
+            "variable_count": len(re.findall(r"\$[a-zA-Z_][a-zA-Z0-9_]*", query_text)),
+            "directive_count": len(re.findall(r"@[a-zA-Z_][a-zA-Z0-9_]*", query_text)),
+            "optimization_hints": self._generate_optimization_hints(query_text),
+            "performance_score": self._calculate_performance_score(query_text),
+        }
+
+        return analysis
+
+    def _generate_optimization_hints(self, query_text: str) -> List[str]:
+        """Generate optimization hints for the query."""
+        hints = []
+
+        # Check for excessive nesting
+        depth = self._calculate_query_depth(query_text)
+        if depth > 10:
+            hints.append("Consider reducing query depth - very deep nesting can impact performance")
+        elif depth > 7:
+            hints.append("Query depth is high - consider using fragments to reduce complexity")
+
+        # Check for missing pagination
+        if re.search(r"\b(users|posts|comments|items|list)\b", query_text, re.IGNORECASE):
+            if not re.search(r"\b(first|last|limit|offset|take|skip)\b", query_text):
+                hints.append("Consider adding pagination to list fields to improve performance")
+
+        # Check for excessive field selection
+        field_count = len(re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\{|$|\()", query_text))
+        if field_count > 50:
+            hints.append("Large number of fields selected - consider using fragments or selecting only needed fields")
+
+        # Check for potential N+1 problems
+        if re.search(r"\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\{", query_text):
+            hints.append("Deep nested selections detected - ensure proper data loading strategies are in place")
+
+        # Check for missing field aliases in complex queries
+        alias_count = len(re.findall(r"[a-zA-Z_][a-zA-Z0-9_]*\s*:", query_text))
+        if field_count > 20 and alias_count == 0:
+            hints.append("Consider using field aliases for better query organization in complex queries")
+
+        return hints
+
+    def _calculate_performance_score(self, query_text: str) -> float:
+        """Calculate a performance score (0-100, higher is better)."""
+        complexity = self._calculate_query_complexity(query_text)
+        depth = self._calculate_query_depth(query_text)
+
+        # Base score
+        score = 100.0
+
+        # Penalize high complexity
+        if complexity > self.max_query_complexity:
+            score -= min(50, (complexity - self.max_query_complexity) * 2)
+        elif complexity > self.max_query_complexity * 0.7:
+            score -= (complexity - self.max_query_complexity * 0.7) * 0.5
+
+        # Penalize high depth
+        if depth > self.max_query_depth:
+            score -= min(30, (depth - self.max_query_depth) * 5)
+        elif depth > self.max_query_depth * 0.7:
+            score -= (depth - self.max_query_depth * 0.7) * 2
+
+        # Bonus for good practices
+        if re.search(r"\b(first|last|limit)\b", query_text):
+            score += 5  # Pagination bonus
+        if re.search(r"fragment\s+", query_text):
+            score += 3  # Fragment usage bonus
+
+        return max(0.0, min(100.0, score))
 
     def update_schema(self, schema: GraphQLSchema) -> None:
         """Update the schema used for validation."""

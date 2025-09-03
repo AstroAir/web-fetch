@@ -81,13 +81,27 @@ class FTPConfig(BaseModel):
 
     # Concurrency and performance
     max_concurrent_downloads: int = Field(
-        default=3, ge=1, le=20, description="Maximum concurrent downloads"
+        default=5, ge=1, le=20, description="Maximum concurrent downloads"
     )
     max_connections_per_host: int = Field(
-        default=2, ge=1, le=10, description="Max connections per host"
+        default=5, ge=1, le=15, description="Max connections per host"
     )
     enable_parallel_downloads: bool = Field(
-        default=False, description="Enable parallel downloads"
+        default=True, description="Enable parallel downloads"
+    )
+
+    # Advanced performance tuning
+    adaptive_chunk_size: bool = Field(
+        default=True, description="Enable adaptive chunk sizing based on transfer performance"
+    )
+    connection_health_check: bool = Field(
+        default=True, description="Enable connection health checks before reuse"
+    )
+    adaptive_cleanup_interval: bool = Field(
+        default=True, description="Enable adaptive connection cleanup based on usage patterns"
+    )
+    performance_monitoring: bool = Field(
+        default=True, description="Enable performance monitoring and metrics collection"
     )
 
     # Retry settings
@@ -103,10 +117,16 @@ class FTPConfig(BaseModel):
 
     # File handling
     chunk_size: int = Field(
-        default=8192, ge=1024, le=1024 * 1024, description="Chunk size for downloads"
+        default=65536, ge=1024, le=1024 * 1024, description="Chunk size for downloads (64KB default for optimal performance)"
     )
     buffer_size: int = Field(
-        default=64 * 1024, ge=8192, description="Buffer size for streaming"
+        default=128 * 1024, ge=8192, description="Buffer size for streaming (128KB default)"
+    )
+    min_chunk_size: int = Field(
+        default=8192, ge=1024, le=65536, description="Minimum chunk size for adaptive sizing"
+    )
+    max_chunk_size: int = Field(
+        default=1024 * 1024, ge=65536, le=10 * 1024 * 1024, description="Maximum chunk size for adaptive sizing"
     )
     max_file_size: Optional[int] = Field(
         default=None, ge=0, description="Maximum file size in bytes"

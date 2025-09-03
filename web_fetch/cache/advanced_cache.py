@@ -372,7 +372,7 @@ class AdvancedCacheManager:
         self.tag_keys: Dict[str, Set[str]] = {}
 
         # Cache warming tasks
-        self.warming_tasks: Set[asyncio.Task] = set()
+        self.warming_tasks: Set[asyncio.Task[Any]] = set()
 
     async def get(self, key: str, default: Any = None) -> Any:
         """
